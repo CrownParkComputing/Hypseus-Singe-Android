@@ -64,12 +64,24 @@ if(TARGET SDL2_image)
 endif()
 
 # ---- SDL2_ttf ----
-hypseus_fetchcontent_declare(SDL2_ttf
-    sdl2_ttf-src
-    https://github.com/libsdl-org/SDL_ttf/archive/refs/tags/release-2.22.0.zip
-)
+if(EXISTS "${HYPSEUS_ANDROID_DEPS_CACHE}/sdl2_ttf-src/CMakeLists.txt")
+    FetchContent_Declare(SDL2_ttf
+        SOURCE_DIR "${HYPSEUS_ANDROID_DEPS_CACHE}/sdl2_ttf-src"
+    )
+else()
+    # SDL_ttf release archives can omit vendored external/freetype sources.
+    # Use git with submodules on clean CI runners so freetype is always present.
+    FetchContent_Declare(SDL2_ttf
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
+        GIT_TAG release-2.22.0
+        GIT_SHALLOW TRUE
+        GIT_SUBMODULES external/freetype external/harfbuzz
+        GIT_SUBMODULES_RECURSE TRUE
+    )
+endif()
 set(SDL2TTF_SAMPLES OFF CACHE BOOL "" FORCE)
 set(SDL2TTF_SDL2_SHARED OFF CACHE BOOL "" FORCE)
+set(SDL2TTF_VENDORED ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(SDL2_ttf)
 if(TARGET SDL2_ttf)
     set_property(TARGET SDL2_ttf PROPERTY INTERFACE_SDL2_SHARED 0)
