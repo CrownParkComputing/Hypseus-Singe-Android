@@ -20,23 +20,6 @@ jobs:
       run:
         working-directory: android-app
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - flavor: Hypseus
-            output_dir: hypseus
-            artifact_name: app-hypseus-debug-apk
-          - flavor: Spaceace
-            output_dir: spaceace
-            artifact_name: app-spaceace-debug-apk
-          - flavor: Dle
-            output_dir: dle
-            artifact_name: app-dle-debug-apk
-          - flavor: Dl2e
-            output_dir: dl2e
-            artifact_name: app-dl2e-debug-apk
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,7 +50,7 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Build ${{ matrix.flavor }} Debug APK
+      - name: Build all Debug APK flavors (local parity)
         run: |
           ./gradlew \
             -Dorg.gradle.java.home="$JAVA_HOME" \
@@ -75,13 +58,44 @@ jobs:
             --console=plain \
             --stacktrace \
             --info \
-            assemble${{ matrix.flavor }}Debug
+            assembleHypseusDebug \
+            assembleSpaceaceDebug \
+            assembleDleDebug \
+            assembleDl2eDebug
 
-      - name: Upload APK artifact (${{ matrix.flavor }})
+      - name: Verify APK outputs
+        run: |
+          test -f app/build/outputs/apk/hypseus/debug/app-hypseus-debug.apk
+          test -f app/build/outputs/apk/spaceace/debug/app-spaceace-debug.apk
+          test -f app/build/outputs/apk/dle/debug/app-dle-debug.apk
+          test -f app/build/outputs/apk/dl2e/debug/app-dl2e-debug.apk
+
+      - name: Upload APK artifact (hypseus)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: android-app/app/build/outputs/apk/${{ matrix.output_dir }}/debug/*.apk
+          name: app-hypseus-debug-apk
+          path: android-app/app/build/outputs/apk/hypseus/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload APK artifact (spaceace)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-spaceace-debug-apk
+          path: android-app/app/build/outputs/apk/spaceace/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload APK artifact (dle)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-dle-debug-apk
+          path: android-app/app/build/outputs/apk/dle/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload APK artifact (dl2e)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-dl2e-debug-apk
+          path: android-app/app/build/outputs/apk/dl2e/debug/*.apk
           if-no-files-found: error
 
   release:
