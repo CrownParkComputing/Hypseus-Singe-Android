@@ -14,6 +14,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: android-app
@@ -63,7 +64,14 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build ${{ matrix.flavor }} Debug APK
-        run: ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" assemble${{ matrix.flavor }}Debug
+        run: |
+          ./gradlew \
+            -Dorg.gradle.java.home="$JAVA_HOME" \
+            --no-daemon \
+            --console=plain \
+            --stacktrace \
+            --info \
+            assemble${{ matrix.flavor }}Debug
 
       - name: Upload APK artifact (${{ matrix.flavor }})
         uses: actions/upload-artifact@v4
