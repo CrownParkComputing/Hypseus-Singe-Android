@@ -69,19 +69,43 @@ if(EXISTS "${HYPSEUS_ANDROID_DEPS_CACHE}/sdl2_ttf-src/CMakeLists.txt")
         SOURCE_DIR "${HYPSEUS_ANDROID_DEPS_CACHE}/sdl2_ttf-src"
     )
 else()
-    # SDL_ttf release archives can omit vendored external/freetype sources.
-    # Use git with submodules on clean CI runners so freetype is always present.
+    # SDL_ttf is built from an archive to avoid live git clone failures on CI.
     FetchContent_Declare(SDL2_ttf
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
-        GIT_TAG release-2.22.0
-        GIT_SHALLOW TRUE
-        GIT_SUBMODULES external/freetype external/harfbuzz
-        GIT_SUBMODULES_RECURSE TRUE
+        URL https://github.com/libsdl-org/SDL_ttf/archive/refs/tags/release-2.22.0.zip
     )
 endif()
 set(SDL2TTF_SAMPLES OFF CACHE BOOL "" FORCE)
 set(SDL2TTF_SDL2_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL2TTF_VENDORED ON CACHE BOOL "" FORCE)
+FetchContent_GetProperties(SDL2_ttf)
+if(NOT sdl2_ttf_POPULATED)
+    FetchContent_Populate(SDL2_ttf)
+endif()
+
+if(NOT EXISTS "${sdl2_ttf_SOURCE_DIR}/external/freetype/CMakeLists.txt")
+    FetchContent_Declare(SDL2_ttf_freetype
+        URL https://github.com/libsdl-org/freetype/archive/refs/heads/VER-2-13-3-SDL.zip
+    )
+    FetchContent_GetProperties(SDL2_ttf_freetype)
+    if(NOT sdl2_ttf_freetype_POPULATED)
+        FetchContent_Populate(SDL2_ttf_freetype)
+    endif()
+    file(MAKE_DIRECTORY "${sdl2_ttf_SOURCE_DIR}/external/freetype")
+    file(COPY "${sdl2_ttf_freetype_SOURCE_DIR}/" DESTINATION "${sdl2_ttf_SOURCE_DIR}/external/freetype")
+endif()
+
+if(NOT EXISTS "${sdl2_ttf_SOURCE_DIR}/external/harfbuzz/CMakeLists.txt")
+    FetchContent_Declare(SDL2_ttf_harfbuzz
+        URL https://github.com/libsdl-org/harfbuzz/archive/refs/heads/8.5.0-SDL.zip
+    )
+    FetchContent_GetProperties(SDL2_ttf_harfbuzz)
+    if(NOT sdl2_ttf_harfbuzz_POPULATED)
+        FetchContent_Populate(SDL2_ttf_harfbuzz)
+    endif()
+    file(MAKE_DIRECTORY "${sdl2_ttf_SOURCE_DIR}/external/harfbuzz")
+    file(COPY "${sdl2_ttf_harfbuzz_SOURCE_DIR}/" DESTINATION "${sdl2_ttf_SOURCE_DIR}/external/harfbuzz")
+endif()
+
 FetchContent_MakeAvailable(SDL2_ttf)
 if(TARGET SDL2_ttf)
     set_property(TARGET SDL2_ttf PROPERTY INTERFACE_SDL2_SHARED 0)
