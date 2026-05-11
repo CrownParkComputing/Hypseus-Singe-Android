@@ -246,10 +246,12 @@ class MainActivity : ComponentActivity() {
                             val detectedLockedSingeScript = findBundledSingeScriptForLockedGame(lockedGameId, launchBaseFolder)
                             if (detectedLockedSingeScript != null) {
                                 launchSinge = detectedLockedSingeScript.absolutePath
-                                if (launchFramefile.isBlank() || !File(launchFramefile).isFile) {
-                                    findBundledFramefileForLockedGame(lockedGameId)?.let { bundledFramefile ->
-                                        launchFramefile = bundledFramefile.absolutePath
-                                    }
+                                // For locked games, ALWAYS use bundled framefile path to avoid stale user selections
+                                // (e.g., a saved classic framefile being picked up in dl2e flavor).
+                                // Construct the bundled framefile path directly (it will be extracted if needed).
+                                val spec = bundledSingeSpecForLockedGame(lockedGameId)
+                                if (spec != null) {
+                                    launchFramefile = File(filesDir, "singe/${spec.runtimeFolder}/${spec.framefileName}").absolutePath
                                 }
                             }
                             
@@ -2620,14 +2622,10 @@ class MainActivity : ComponentActivity() {
 
     private fun findBundledSingeScriptForLockedGame(lockedGameId: String, baseFolder: String): File? {
         val spec = bundledSingeSpecForLockedGame(lockedGameId) ?: return null
+        // For locked games, always return the bundled script path without checking if it exists yet;
+        // it will be extracted during asset extraction (which runs before launch thread uses it).
         val internalScript = File(filesDir, "singe/${spec.runtimeFolder}/${spec.scriptFile}")
-        if (internalScript.isFile) return internalScript
-
-        return if (normalizeLaunchGameName(lockedGameId) == "ace") {
-            findSpaceAceSingeScript(baseFolder)
-        } else {
-            null
-        }
+        return internalScript
     }
 
     private fun findBundledFramefileForLockedGame(lockedGameId: String): File? {
