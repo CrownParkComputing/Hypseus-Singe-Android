@@ -1,0 +1,102 @@
+name: Android APK Build (DLe/DL2e)
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-app
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: Dle
+            output_dir: dle
+            artifact_name: app-dle-debug-apk
+          - flavor: Dl2e
+            output_dir: dl2e
+            artifact_name: app-dl2e-debug-apk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Ensure Git LFS objects are present
+        run: |
+          git lfs install --local
+          git lfs pull
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install Android platform and build tools
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Build ${{ matrix.flavor }} Debug APK
+        run: ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" assemble${{ matrix.flavor }}Debug
+
+      - name: Upload APK artifact (${{ matrix.flavor }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: android-app/app/build/outputs/apk/${{ matrix.output_dir }}/debug/*.apk
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download built APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          pattern: app-*-debug-apk
+          merge-multiple: true
+
+      - name: Prepare versioned APK names
+        id: prep
+        run: |
+          VERSION="v0.1.${GITHUB_RUN_NUMBER}"
+          mkdir -p packaged
+          for apk in release-artifacts/*.apk; do
+            base="$(basename "$apk" .apk)"
+            cp "$apk" "packaged/${base}-${VERSION}.apk"
+          done
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dle-dl2e-${{ steps.prep.outputs.version }}
+          name: DLe/DL2e Android Build ${{ steps.prep.outputs.version }}
+          generate_release_notes: true
+          files: packaged/*.apk

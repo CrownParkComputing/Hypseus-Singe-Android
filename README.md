@@ -51,6 +51,48 @@ Notes:
 
 - `org.hypseus.singe.spaceace`: Space Ace locked launcher (`spaceace` flavor)
 
+## Upstream Sync Pipeline (Deterministic)
+
+Space Ace framework/script assets bundled in the APK are synced from upstream with a pinned ref.
+
+Source:
+
+- `https://github.com/DirtBagXon/hypseus_singe_data`
+- Path: `00-singe2/Framework` and `00-singe2/SAe/SAe.singe`
+
+Synced outputs in this repo:
+
+- `android-app/app/src/main/assets/runtime/singe/Framework/`
+- `android-app/app/src/main/assets/runtime/templates/spaceace/SAe.singe`
+- Lock manifest: `android-app/upstream/spaceace-sync-lock.json`
+
+### Local sync command
+
+Run from repository root:
+
+```powershell
+./android-app/scripts/sync_spaceace_upstream.ps1 -SingeDataRef master
+```
+
+You can also pin a tag or commit SHA:
+
+```powershell
+./android-app/scripts/sync_spaceace_upstream.ps1 -SingeDataRef <tag-or-sha>
+```
+
+### GitHub manual workflow
+
+Use workflow:
+
+- `.github/workflows/sync-spaceace-upstream.yml`
+
+Inputs:
+
+- `singe_data_ref`: branch/tag/SHA to pin
+- `commit_message`: commit message for generated sync commit
+
+This workflow updates bundled runtime files and commits them only when changes are detected.
+
 ## Related Documentation
 
 - `doc/SingeGameLayout.md`

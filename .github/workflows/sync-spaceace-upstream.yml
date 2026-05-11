@@ -1,0 +1,49 @@
+name: Sync Space Ace Upstream Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      singe_data_ref:
+        description: "Branch, tag, or commit for DirtBagXon/hypseus_singe_data"
+        required: true
+        default: "master"
+      commit_message:
+        description: "Commit message for synced assets"
+        required: true
+        default: "Sync Space Ace framework/script from upstream"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync Space Ace runtime assets from upstream
+        shell: pwsh
+        run: |
+          ./android-app/scripts/sync_spaceace_upstream.ps1 -SingeDataRef "${{ github.event.inputs.singe_data_ref }}"
+
+      - name: Show changed files
+        run: git status --short
+
+      - name: Commit and push if changed
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add android-app/app/src/main/assets/runtime/singe/Framework \
+                    android-app/app/src/main/assets/runtime/templates/spaceace/SAe.singe \
+                    android-app/upstream/spaceace-sync-lock.json
+            git commit -m "${{ github.event.inputs.commit_message }}"
+            git push
+          else
+            echo "No upstream asset changes detected."
+          fi

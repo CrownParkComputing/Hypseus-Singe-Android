@@ -75,6 +75,26 @@ android {
             buildConfigField("String", "LOCKED_GAME_ID", "\"ace\"")
             resValue("string", "app_name", "Space Ace")
         }
+
+        create("dle") {
+            dimension = "edition"
+            applicationId = "org.hypseus.singe.dle"
+            versionNameSuffix = "-dle"
+            buildConfigField("String", "GAME_PROFILE", "\"dle\"")
+            buildConfigField("boolean", "LOCK_GAME_SELECTION", "true")
+            buildConfigField("String", "LOCKED_GAME_ID", "\"dle\"")
+            resValue("string", "app_name", "Dragon's Lair Extended")
+        }
+
+        create("dl2e") {
+            dimension = "edition"
+            applicationId = "org.hypseus.singe.dl2e"
+            versionNameSuffix = "-dl2e"
+            buildConfigField("String", "GAME_PROFILE", "\"dl2e\"")
+            buildConfigField("boolean", "LOCK_GAME_SELECTION", "true")
+            buildConfigField("String", "LOCKED_GAME_ID", "\"dl2e\"")
+            resValue("string", "app_name", "Dragon's Lair II Extended")
+        }
     }
 
     packaging {
