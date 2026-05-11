@@ -419,8 +419,8 @@ class MainActivity : ComponentActivity() {
                                 Log.d("HypseusMain", "Skipping SAe detection: game != 'ace' (game=$game)")
                             }
                             
-                            // For Singe Space Ace, launch as "singe vldp" instead of "ace vldp"
-                            val launchGame = if (aceUseSinge) "singe" else game
+                            // All Singe-family games must launch via "singe" with an explicit script path.
+                            val launchGame = if (aceUseSinge || isSingeGame(game) || game == "singe") "singe" else game
                             val args = mutableListOf(
                                 launchGame, "vldp",
                                 "-framefile", framefileRelative,
@@ -451,7 +451,7 @@ class MainActivity : ComponentActivity() {
                                 args.add("-romdir"); args.add(effectiveRomDir)
                             }
                             var launchSingeDir = launchBaseFolder
-                            if (game == "singe" && launchSinge.isNotEmpty() && !launchSinge.endsWith(".zip", ignoreCase = true)) {
+                            if (launchGame == "singe" && launchSinge.isNotEmpty() && !launchSinge.endsWith(".zip", ignoreCase = true)) {
                                 val patchedLaunch = prepareSingeScriptForAndroid(launchSinge)
                                 if (patchedLaunch != null) {
                                     launchSinge = patchedLaunch.scriptPath
@@ -464,7 +464,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            if ((game == "singe" && launchSinge.isNotEmpty()) || aceUseSinge) {
+                            if ((launchGame == "singe" && launchSinge.isNotEmpty()) || aceUseSinge) {
                                 val singeScript = if (aceUseSinge) aceSingeScriptPath else launchSinge
                                 if (!File(singeScript).isFile) {
                                     runOnUiThread {
@@ -1771,6 +1771,22 @@ class MainActivity : ComponentActivity() {
         var romDirPath = requestedRomDir.ifBlank { baseFolder }
         var singeScriptPath = requestedSingeScript
         val report = mutableListOf<String>()
+
+        val lockedGameId = BuildConfig.LOCKED_GAME_ID
+        val normalizedLockedGame = normalizeLaunchGameName(lockedGameId)
+        val lockedBundledFramefile = findBundledFramefileForLockedGame(lockedGameId)
+        if (BuildConfig.LOCK_GAME_SELECTION && lockedBundledFramefile != null) {
+            // Locked single-game APKs should always prefer bundled framefiles to avoid
+            // stale user selections (for example a previously saved classic framefile
+            // being used in the DL2e flavor).
+            val shouldForceBundledFramefile =
+                normalizedGame == normalizedLockedGame ||
+                    (normalizedGame == "singe" && isSingeGame(normalizedLockedGame))
+            if (shouldForceBundledFramefile) {
+                framefilePath = lockedBundledFramefile.absolutePath
+                report += "Framefile: forcing locked bundled framefile $framefilePath"
+            }
+        }
 
         val base = File(baseFolder)
         report += "Base folder: $baseFolder (exists=${base.isDirectory})"

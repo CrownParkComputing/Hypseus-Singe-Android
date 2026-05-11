@@ -61,7 +61,8 @@ jobs:
             assembleHypseusDebug \
             assembleSpaceaceDebug \
             assembleDleDebug \
-            assembleDl2eDebug
+            assembleDl2eDebug \
+            assembleDlclassicDebug
 
       - name: Verify APK outputs
         run: |
@@ -69,6 +70,7 @@ jobs:
           test -f app/build/outputs/apk/spaceace/debug/app-spaceace-debug.apk
           test -f app/build/outputs/apk/dle/debug/app-dle-debug.apk
           test -f app/build/outputs/apk/dl2e/debug/app-dl2e-debug.apk
+          test -f app/build/outputs/apk/dlclassic/debug/app-dlclassic-debug.apk
 
       - name: Upload APK artifact (hypseus)
         uses: actions/upload-artifact@v4
@@ -96,6 +98,13 @@ jobs:
         with:
           name: app-dl2e-debug-apk
           path: android-app/app/build/outputs/apk/dl2e/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload APK artifact (dlclassic)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-dlclassic-debug-apk
+          path: android-app/app/build/outputs/apk/dlclassic/debug/*.apk
           if-no-files-found: error
 
   release:

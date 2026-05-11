@@ -26,7 +26,8 @@ try {
         @{ Name = "hypseus"; TaskFlavor = "Hypseus"; AppId = "org.hypseus.singe" },
         @{ Name = "spaceace"; TaskFlavor = "Spaceace"; AppId = "org.hypseus.singe.spaceace" },
         @{ Name = "dle"; TaskFlavor = "Dle"; AppId = "org.hypseus.singe.dle" },
-        @{ Name = "dl2e"; TaskFlavor = "Dl2e"; AppId = "org.hypseus.singe.dl2e" }
+        @{ Name = "dl2e"; TaskFlavor = "Dl2e"; AppId = "org.hypseus.singe.dl2e" },
+        @{ Name = "dlclassic"; TaskFlavor = "Dlclassic"; AppId = "org.hypseus.singe.dlclassic" }
     )
 
     $gradleTargets = @()

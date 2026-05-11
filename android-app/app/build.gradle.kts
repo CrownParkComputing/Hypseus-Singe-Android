@@ -95,6 +95,16 @@ android {
             buildConfigField("String", "LOCKED_GAME_ID", "\"dl2e\"")
             resValue("string", "app_name", "Dragons Lair II Extended")
         }
+
+        create("dlclassic") {
+            dimension = "edition"
+            applicationId = "org.hypseus.singe.dlclassic"
+            versionNameSuffix = "-dlclassic"
+            buildConfigField("String", "GAME_PROFILE", "\"dlclassic\"")
+            buildConfigField("boolean", "LOCK_GAME_SELECTION", "true")
+            buildConfigField("String", "LOCKED_GAME_ID", "\"dlclassic\"")
+            resValue("string", "app_name", "Dragons Lair Classic")
+        }
     }
 
     packaging {
