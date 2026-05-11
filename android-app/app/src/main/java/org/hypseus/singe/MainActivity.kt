@@ -237,7 +237,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                            val launchBaseFolder = normalizeBaseFolderSelection(capturedBaseFolder, launchGameName)
+                            val launchBaseFolder = normalizeBaseFolderSelection(capturedBaseFolder, requestedGame)
                             val launchFramefile = capturedFramefile
                             val launchRomDir = capturedRomDir
                             var launchSinge = capturedSinge
@@ -1674,7 +1674,7 @@ class MainActivity : ComponentActivity() {
         val folderName = base.name.trim().lowercase()
         val likelyMediaLeaf = folderName in setOf("video", "videos", "media", "sounds", "sound", "overlay", "script")
 
-        val candidates = buildList {
+        val candidates: List<File> = buildList<File> {
             add(base)
             base.parentFile?.let { add(it) }
             base.parentFile?.parentFile?.let { add(it) }
@@ -1686,7 +1686,7 @@ class MainActivity : ComponentActivity() {
 
         return when {
             preferred != null -> preferred.absolutePath
-            likelyMediaLeaf && base.parentFile?.isDirectory == true -> base.parentFile!!.absolutePath
+            likelyMediaLeaf && base.parentFile?.isDirectory == true -> base.parentFile?.absolutePath ?: baseFolder
             else -> baseFolder
         }
     }
