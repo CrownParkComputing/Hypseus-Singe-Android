@@ -53,18 +53,27 @@ Notes:
 
 ## Upstream Sync Pipeline (Deterministic)
 
-Space Ace framework/script assets bundled in the APK are synced from upstream with a pinned ref.
+Game framework/script assets bundled in APKs are synced from upstream with pinned refs.
 
 Source:
 
 - `https://github.com/DirtBagXon/hypseus_singe_data`
-- Path: `00-singe2/Framework` and `00-singe2/SAe/SAe.singe`
+- Paths used:
+  - `00-singe2/Framework` (or fallback `FrameworkKimmy`)
+  - `00-singe2/SAe/SAe.singe`
+  - `00-singe2/DLe/DLe.singe`
+  - `00-singe2/DL2e/DL2e.singe`
 
 Synced outputs in this repo:
 
 - `android-app/app/src/main/assets/runtime/singe/Framework/`
 - `android-app/app/src/main/assets/runtime/templates/spaceace/SAe.singe`
-- Lock manifest: `android-app/upstream/spaceace-sync-lock.json`
+- `android-app/app/src/main/assets/runtime/templates/dle/DLe.singe`
+- `android-app/app/src/main/assets/runtime/templates/dl2e/DL2e.singe`
+- Lock manifests:
+  - `android-app/upstream/spaceace-sync-lock.json`
+  - `android-app/upstream/dle-sync-lock.json`
+  - `android-app/upstream/dl2e-sync-lock.json`
 
 ### Local sync command
 
@@ -72,6 +81,8 @@ Run from repository root:
 
 ```powershell
 ./android-app/scripts/sync_spaceace_upstream.ps1 -SingeDataRef master
+./android-app/scripts/sync_dle_upstream.ps1 -SingeDataRef master
+./android-app/scripts/sync_dl2e_upstream.ps1 -SingeDataRef master
 ```
 
 You can also pin a tag or commit SHA:
@@ -85,13 +96,15 @@ You can also pin a tag or commit SHA:
 Use workflow:
 
 - `.github/workflows/sync-spaceace-upstream.yml`
+- `.github/workflows/sync-dle-upstream.yml`
+- `.github/workflows/sync-dl2e-upstream.yml`
 
 Inputs:
 
 - `singe_data_ref`: branch/tag/SHA to pin
 - `commit_message`: commit message for generated sync commit
 
-This workflow updates bundled runtime files and commits them only when changes are detected.
+These workflows update bundled runtime files and commit only when changes are detected.
 
 ## Related Documentation
 
