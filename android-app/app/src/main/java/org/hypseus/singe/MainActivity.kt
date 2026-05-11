@@ -3074,6 +3074,10 @@ class MainActivity : ComponentActivity() {
         val gamepadIni = File(filesDir, "hypinput_gamepad.ini")
         if (sentinel.exists() && gamepadIni.exists()) {
             refreshRuntimeFile("runtime/hypinput_gamepad.ini", "hypinput_gamepad.ini")
+            // Keep Singe framework/templates up to date on upgrades even when the
+            // legacy sentinel indicates runtime extraction already happened.
+            refreshRuntimeDir("runtime/singe/Framework")
+            refreshRuntimeDir("runtime/templates/spaceace")
             Log.d("HypseusMain", "extractBundledAssets: sentinel exists, skipping")
             return
         }
@@ -3098,6 +3102,15 @@ class MainActivity : ComponentActivity() {
             Log.d("HypseusMain", "Refreshed $assetPath -> ${target.absolutePath}")
         } catch (e: Exception) {
             Log.e("HypseusMain", "Failed to refresh $assetPath: ${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
+    private fun refreshRuntimeDir(assetPath: String) {
+        try {
+            extractAssetDir(assetPath, filesDir)
+            Log.d("HypseusMain", "Refreshed directory $assetPath")
+        } catch (e: Exception) {
+            Log.e("HypseusMain", "Failed to refresh directory $assetPath: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
