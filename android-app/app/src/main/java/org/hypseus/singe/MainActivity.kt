@@ -1531,9 +1531,12 @@ class MainActivity : ComponentActivity() {
         if (resolvedFramefile.isBlank() || !File(resolvedFramefile).isFile) {
             missing += "Framefile missing: $resolvedFramefile"
         } else {
-            val media = resolveFramefileVideoPath(resolvedFramefile)
-            if (media.isNullOrBlank() || !File(media).exists()) {
-                missing += "Framefile media missing: ${media ?: "<unresolved>"}"
+            // Skip m2v validation for Singe mode (uses ROMs, not video)
+            if (!isSingeGame(gameLower) && gameLower != "singe") {
+                val media = resolveFramefileVideoPath(resolvedFramefile)
+                if (media.isNullOrBlank() || !File(media).exists()) {
+                    missing += "Framefile media missing: ${media ?: "<unresolved>"}"
+                }
             }
         }
 
