@@ -1,5 +1,8 @@
 name: Android APK Build
 
+permissions:
+  contents: write
+
 on:
   push:
     branches:
@@ -63,3 +66,35 @@ jobs:
           name: app-${{ matrix.flavor }}-debug-apk
           path: android-app/app/build/outputs/apk/${{ matrix.output_dir }}/debug/*.apk
           if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download built APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          pattern: app-*-debug-apk
+          merge-multiple: true
+
+      - name: Prepare versioned APK names
+        id: prep
+        run: |
+          VERSION="v0.1.${GITHUB_RUN_NUMBER}"
+          mkdir -p packaged
+          for apk in release-artifacts/*.apk; do
+            base="$(basename "$apk" .apk)"
+            cp "$apk" "packaged/${base}-${VERSION}.apk"
+          done
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.prep.outputs.version }}
+          name: Android Build ${{ steps.prep.outputs.version }}
+          generate_release_notes: true
+          files: packaged/*.apk
