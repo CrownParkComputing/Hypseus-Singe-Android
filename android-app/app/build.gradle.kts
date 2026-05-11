@@ -4,12 +4,6 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-tasks.withType<JavaCompile>().configureEach {
-    options.isFork = true
-    options.forkOptions.executable =
-        "C:/Users/jonat/.jdks/jbr-17.0.14/bin/javac.exe"
-}
-
 android {
     namespace = "org.hypseus.singe"
     compileSdk = 35
