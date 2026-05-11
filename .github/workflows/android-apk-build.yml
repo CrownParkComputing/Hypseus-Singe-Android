@@ -48,7 +48,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build ${{ matrix.flavor }} Debug APK
-        run: ./gradlew assemble${{ matrix.flavor }}Debug
+        run: ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" assemble${{ matrix.flavor }}Debug
 
       - name: Upload APK artifact (${{ matrix.flavor }})
         uses: actions/upload-artifact@v4
