@@ -18,6 +18,20 @@ jobs:
       run:
         working-directory: android-app
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: Spaceace
+            output_dir: spaceace
+            artifact_name: app-spaceace-debug-apk
+          - flavor: Dle
+            output_dir: dle
+            artifact_name: app-dle-debug-apk
+          - flavor: Dl2e
+            output_dir: dl2e
+            artifact_name: app-dl2e-debug-apk
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,14 +62,14 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Build Spaceace Debug APK
-        run: ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" assembleSpaceaceDebug
+      - name: Build ${{ matrix.flavor }} Debug APK
+        run: ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" assemble${{ matrix.flavor }}Debug
 
-      - name: Upload APK artifact (Spaceace)
+      - name: Upload APK artifact (${{ matrix.flavor }})
         uses: actions/upload-artifact@v4
         with:
-          name: app-spaceace-debug-apk
-          path: android-app/app/build/outputs/apk/spaceace/debug/*.apk
+          name: ${{ matrix.artifact_name }}
+          path: android-app/app/build/outputs/apk/${{ matrix.output_dir }}/debug/*.apk
           if-no-files-found: error
 
   release:
@@ -68,7 +82,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
-          pattern: app-spaceace-debug-apk
+          pattern: app-*-debug-apk
           merge-multiple: true
 
       - name: Prepare versioned APK names
@@ -86,6 +100,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.prep.outputs.version }}
-          name: Space Ace Android Build ${{ steps.prep.outputs.version }}
+          name: Android Game Builds ${{ steps.prep.outputs.version }}
           generate_release_notes: true
           files: packaged/*.apk

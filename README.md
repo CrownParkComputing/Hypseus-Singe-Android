@@ -6,9 +6,11 @@ This repository builds Android APKs for Hypseus Singe and publishes them through
 
 - Every successful build on `main` or `master` creates or updates a GitHub Release.
 - Release tag format is `v0.1.<run_number>`.
-- Only the Space Ace APK is built and uploaded.
-- APK file is uploaded with a versioned name, for example:
+- Three game-specific APKs are built and uploaded per run.
+- APK files are uploaded with versioned names, for example:
   - `app-spaceace-debug-v0.1.123.apk`
+  - `app-dle-debug-v0.1.123.apk`
+  - `app-dl2e-debug-v0.1.123.apk`
 
 ## Runtime File Model (Android)
 
