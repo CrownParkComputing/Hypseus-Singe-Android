@@ -8,6 +8,25 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Get-RelativePathPortable {
+    param(
+        [Parameter(Mandatory = $true)][string]$BasePath,
+        [Parameter(Mandatory = $true)][string]$TargetPath
+    )
+
+    $baseFull = [System.IO.Path]::GetFullPath($BasePath)
+    $targetFull = [System.IO.Path]::GetFullPath($TargetPath)
+
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        return [System.IO.Path]::GetRelativePath($baseFull, $targetFull)
+    }
+
+    $baseUri = New-Object System.Uri(($baseFull.TrimEnd('\\', '/') + [System.IO.Path]::DirectorySeparatorChar))
+    $targetUri = New-Object System.Uri($targetFull)
+    $relativeUri = $baseUri.MakeRelativeUri($targetUri)
+    return [System.Uri]::UnescapeDataString($relativeUri.ToString()).Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+}
+
 function Get-FileHashInfo {
     param(
         [Parameter(Mandatory = $true)][string]$Root,
@@ -16,7 +35,7 @@ function Get-FileHashInfo {
 
     $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $Path
     $item = Get-Item -LiteralPath $Path
-    $relative = [System.IO.Path]::GetRelativePath($Root, $Path).Replace('\\', '/')
+    $relative = (Get-RelativePathPortable -BasePath $Root -TargetPath $Path).Replace('\\', '/')
 
     return [PSCustomObject]@{
         path = $relative
@@ -105,7 +124,7 @@ try {
             framework = [System.IO.Path]::GetFileName($frameworkToUse)
         }
         outputs = [PSCustomObject]@{
-            runtimeRoot = [System.IO.Path]::GetRelativePath((Split-Path -Parent $scriptDir), $runtimeRootAbs).Replace('\\', '/')
+            runtimeRoot = (Get-RelativePathPortable -BasePath (Split-Path -Parent $scriptDir) -TargetPath $runtimeRootAbs).Replace('\\', '/')
             frameworkPath = "singe/Framework"
             spaceAceScriptTemplate = "templates/spaceace/SAe.singe"
         }
