@@ -3079,12 +3079,14 @@ class MainActivity : ComponentActivity() {
             // legacy sentinel indicates runtime extraction already happened.
             refreshRuntimeDir("runtime/singe/Framework")
             refreshRuntimeDir("runtime/templates/spaceace")
+            refreshSinge2SpaceAceSupportTree()
             Log.d("HypseusMain", "extractBundledAssets: sentinel exists, skipping")
             return
         }
         Log.d("HypseusMain", "extractBundledAssets: extracting runtime assets to ${filesDir.absolutePath}")
         try {
             extractAssetDir("runtime", filesDir)
+            refreshSinge2SpaceAceSupportTree()
             Log.d("HypseusMain", "extractBundledAssets: complete")
         } catch (e: Exception) {
             Log.e("HypseusMain", "extractBundledAssets failed: ${e.javaClass.simpleName}: ${e.message}")
@@ -3113,6 +3115,60 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             Log.e("HypseusMain", "Failed to refresh directory $assetPath: ${e.javaClass.simpleName}: ${e.message}")
         }
+    }
+
+    private fun refreshRuntimeDirTo(assetPath: String, relativeTargetPath: String) {
+        try {
+            val target = File(filesDir, relativeTargetPath)
+            target.mkdirs()
+            copyAssetDir(assetPath, target)
+            Log.d("HypseusMain", "Refreshed directory $assetPath -> ${target.absolutePath}")
+        } catch (e: Exception) {
+            Log.e("HypseusMain", "Failed to refresh directory $assetPath to $relativeTargetPath: ${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
+    private fun copyAssetDir(assetPath: String, destRoot: File, relativePath: String = "") {
+        val children = assets.list(assetPath)
+        if (children == null || children.isEmpty()) {
+            val target = if (relativePath.isEmpty()) destRoot else File(destRoot, relativePath)
+            target.parentFile?.mkdirs()
+            assets.open(assetPath).use { input: InputStream ->
+                target.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            return
+        }
+
+        for (child in children) {
+            val childPath = if (relativePath.isEmpty()) child else "$relativePath/$child"
+            copyAssetDir("$assetPath/$child", destRoot, childPath)
+        }
+    }
+
+    private fun refreshSinge2SpaceAceSupportTree() {
+        val saeRoot = File(filesDir, "singe/SAe")
+        val cfgDir = File(saeRoot, "Cfg")
+        val scriptDir = File(saeRoot, "Script")
+        val overlayDir = File(saeRoot, "Overlay")
+        val soundsDir = File(saeRoot, "Sounds")
+        val fontsDir = File(saeRoot, "Fonts")
+        val videoDir = File(saeRoot, "Video")
+
+        cfgDir.mkdirs()
+        scriptDir.mkdirs()
+        overlayDir.mkdirs()
+        soundsDir.mkdirs()
+        fontsDir.mkdirs()
+        videoDir.mkdirs()
+
+        refreshRuntimeFile("runtime/templates/spaceace/SAe.singe", "singe/SAe/SAe.singe")
+        refreshRuntimeFile("runtime/templates/spaceace/SAe.txt", "singe/SAe/SAe.txt")
+        refreshRuntimeDirTo("runtime/pics", "singe/SAe/Overlay")
+        refreshRuntimeDirTo("runtime/sound", "singe/SAe/Sounds")
+        refreshRuntimeDirTo("runtime/fonts", "singe/SAe/Fonts")
+        refreshRuntimeFile("runtime/fonts/default.ttf", "singe/SAe/Fonts/font.ttf")
     }
 
     // Recursively extract assets under assetPath into destRoot, stripping the
