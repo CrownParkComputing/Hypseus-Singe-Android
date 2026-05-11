@@ -1742,14 +1742,25 @@ class MainActivity : ComponentActivity() {
         candidates += File(base, "vldp/$romSet/$romSet.txt")
         if (normalizeLaunchGameName(game) == "ace") {
             candidates += File(base, "ace.txt")
+            candidates += File(base, "SAe.txt")
+            candidates += File(base, "sae.txt")
+            candidates += File(base, "SAe/SAe.txt")
+            candidates += File(base, "SAe/sae.txt")
             candidates += File(base, "spaceace/ace.txt")
+            candidates += File(base, "spaceace/sae.txt")
         }
 
         candidates.firstOrNull { it.isFile }?.let { return it.absolutePath }
 
-        val recursiveName = if (normalizeLaunchGameName(game) == "ace") "ace.txt" else "$romSet.txt"
-        val recursiveMatch = findFirstNamedFile(base, recursiveName, 4)
-            ?: findFirstNamedFile(base, "framefile.txt", 4)
+        val recursiveMatch = if (normalizeLaunchGameName(game) == "ace") {
+            findFirstNamedFile(base, "SAe.txt", 4)
+                ?: findFirstNamedFile(base, "sae.txt", 4)
+                ?: findFirstNamedFile(base, "ace.txt", 4)
+                ?: findFirstNamedFile(base, "framefile.txt", 4)
+        } else {
+            findFirstNamedFile(base, "$romSet.txt", 4)
+                ?: findFirstNamedFile(base, "framefile.txt", 4)
+        }
         return recursiveMatch?.absolutePath ?: fallback
     }
 
