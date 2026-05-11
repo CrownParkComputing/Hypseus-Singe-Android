@@ -21,7 +21,8 @@ function Get-RelativePathPortable {
         return [System.IO.Path]::GetRelativePath($baseFull, $targetFull)
     }
 
-    $baseUri = New-Object System.Uri(($baseFull.TrimEnd('\\', '/') + [System.IO.Path]::DirectorySeparatorChar))
+    $trimmedBase = $baseFull.TrimEnd('\').TrimEnd('/')
+    $baseUri = New-Object System.Uri(($trimmedBase + [System.IO.Path]::DirectorySeparatorChar))
     $targetUri = New-Object System.Uri($targetFull)
     $relativeUri = $baseUri.MakeRelativeUri($targetUri)
     return [System.Uri]::UnescapeDataString($relativeUri.ToString()).Replace('/', [System.IO.Path]::DirectorySeparatorChar)
@@ -35,7 +36,7 @@ function Get-FileHashInfo {
 
     $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $Path
     $item = Get-Item -LiteralPath $Path
-    $relative = (Get-RelativePathPortable -BasePath $Root -TargetPath $Path).Replace('\\', '/')
+    $relative = (Get-RelativePathPortable -BasePath $Root -TargetPath $Path).Replace('\', '/')
 
     return [PSCustomObject]@{
         path = $relative
@@ -59,61 +60,46 @@ Write-Host "[sync] Cloning: $SingeDataRepo @ $SingeDataRef"
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 
 try {
-    git clone $SingeDataRepo $cloneDir | Out-Host
-    git -C $cloneDir checkout $SingeDataRef | Out-Host
+    git clone $SingeDataRepo $cloneDir --quiet
+    git -C $cloneDir checkout $SingeDataRef --quiet
 
     $commit = (git -C $cloneDir rev-parse HEAD).Trim()
 
-    $singe2Root = Join-Path $cloneDir "00-singe2"
-    $frameworkSource = Join-Path $singe2Root "Framework"
-    $frameworkKimmySource = Join-Path $singe2Root "FrameworkKimmy"
-    $saeFolder = Join-Path $singe2Root "SAe"
-
-    if (-not (Test-Path -LiteralPath $frameworkSource) -and -not (Test-Path -LiteralPath $frameworkKimmySource)) {
-        throw "Neither Framework nor FrameworkKimmy exists in 00-singe2."
+    $frameworkSrc = Join-Path $cloneDir "00-singe2\Framework"
+    if (-not (Test-Path -LiteralPath $frameworkSrc)) {
+        $frameworkSrc = Join-Path $cloneDir "00-singe2\FrameworkKimmy"
     }
-    if (-not (Test-Path -LiteralPath $saeFolder)) {
-        throw "SAe folder does not exist in 00-singe2."
+    if (-not (Test-Path -LiteralPath $frameworkSrc)) {
+        throw "No Framework or FrameworkKimmy directory found in 00-singe2."
     }
 
-    $frameworkToUse = if (Test-Path -LiteralPath $frameworkSource) { $frameworkSource } else { $frameworkKimmySource }
+    $frameworkDest = Join-Path $runtimeRootAbs "singe\Framework"
+    
+    Write-Host "[sync] Copying framework from: $frameworkSrc"
+    if (Test-Path $frameworkDest) { Remove-Item -Recurse -Force $frameworkDest }
+    New-Item -ItemType Directory -Path (Split-Path -Parent $frameworkDest) -Force | Out-Null
+    Copy-Item -Recurse -Force $frameworkSrc $frameworkDest
+    
+    $files = Get-ChildItem -Path $frameworkDest -Recurse -File
+    $fileInfos = $files | ForEach-Object { Get-FileHashInfo -Root $runtimeRootAbs -Path $_.FullName }
 
-    $saeScript = @(
-        (Join-Path $saeFolder "SAe.singe"),
-        (Join-Path $saeFolder "sae.singe")
+    $saeSrc = @(
+        (Join-Path $cloneDir "00-singe2\SAe\SAe.singe"),
+        (Join-Path $cloneDir "00-singe2\SAe\sae.singe")
     ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-
-    if (-not $saeScript) {
+    if (-not $saeSrc) {
         throw "No SAe.singe/sae.singe found in 00-singe2/SAe."
     }
 
-    $destFramework = Join-Path $runtimeRootAbs "singe/Framework"
-    $destSpaceAceScript = Join-Path $runtimeRootAbs "templates/spaceace/SAe.singe"
-
-    New-Item -ItemType Directory -Path $runtimeRootAbs -Force | Out-Null
-
-    if (Test-Path -LiteralPath $destFramework) {
-        Remove-Item -LiteralPath $destFramework -Recurse -Force
-    }
-    New-Item -ItemType Directory -Path $destFramework -Force | Out-Null
-
-    Write-Host "[sync] Copying framework from: $frameworkToUse"
-    Copy-Item -LiteralPath (Join-Path $frameworkToUse "*") -Destination $destFramework -Recurse -Force
-
-    $destSpaceAceScriptDir = Split-Path -Parent $destSpaceAceScript
-    New-Item -ItemType Directory -Path $destSpaceAceScriptDir -Force | Out-Null
-    Copy-Item -LiteralPath $saeScript -Destination $destSpaceAceScript -Force
-
-    $trackedFiles = @()
-    $frameworkFiles = Get-ChildItem -LiteralPath $destFramework -Recurse -File
-    foreach ($f in $frameworkFiles) {
-        $trackedFiles += Get-FileHashInfo -Root $runtimeRootAbs -Path $f.FullName
-    }
-    $trackedFiles += Get-FileHashInfo -Root $runtimeRootAbs -Path $destSpaceAceScript
-    $trackedFiles = $trackedFiles | Sort-Object path
-
-    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
-
+    $saeDest = Join-Path $runtimeRootAbs "templates\spaceace\SAe.singe"
+    
+    Write-Host "[sync] Copying SAe.singe from: $saeSrc"
+    New-Item -ItemType Directory -Path (Split-Path -Parent $saeDest) -Force | Out-Null
+    Copy-Item -Force $saeSrc $saeDest
+    
+    $saeInfo = Get-FileHashInfo -Root $runtimeRootAbs -Path $saeDest
+    $fileInfos += $saeInfo
+    
     $manifest = [PSCustomObject]@{
         generatedAtUtc = [DateTime]::UtcNow.ToString("o")
         source = [PSCustomObject]@{
@@ -121,25 +107,22 @@ try {
             ref = $SingeDataRef
             commit = $commit
             game = "SAe"
-            framework = [System.IO.Path]::GetFileName($frameworkToUse)
+            framework = [System.IO.Path]::GetFileName($frameworkSrc)
         }
         outputs = [PSCustomObject]@{
             runtimeRoot = (Get-RelativePathPortable -BasePath (Split-Path -Parent $scriptDir) -TargetPath $runtimeRootAbs).Replace('\\', '/')
             frameworkPath = "singe/Framework"
             spaceAceScriptTemplate = "templates/spaceace/SAe.singe"
         }
-        files = $trackedFiles
+        files = $fileInfos | Sort-Object path
     }
-
-    $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestAbs -Encoding utf8
-
-    Write-Host "[sync] Completed successfully."
-    Write-Host "[sync] Upstream commit: $commit"
-    Write-Host "[sync] Files synced: $($trackedFiles.Count)"
-    Write-Host "[sync] Manifest: $manifestAbs"
+    
+    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
+    $manifest | ConvertTo-Json -Depth 10 | Set-Content -Path $manifestAbs
+    Write-Host "[sync] Manifest written to: $manifestAbs"
 }
 finally {
-    if (-not $KeepTemp -and (Test-Path -LiteralPath $tempRoot)) {
-        Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    if (-not $KeepTemp -and (Test-Path $tempRoot)) {
+        Remove-Item -Recurse -Force $tempRoot
     }
 }

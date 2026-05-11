@@ -1,0 +1,57 @@
+{
+    "generatedAtUtc":  "2026-05-11T10:28:27.9498437Z",
+    "source":  {
+                   "repo":  "https://github.com/DirtBagXon/hypseus_singe_data.git",
+                   "ref":  "master",
+                   "commit":  "42b2e07a1240174f5f8251714e849e6325392a61",
+                   "game":  "SAe",
+                   "framework":  "Framework"
+               },
+    "outputs":  {
+                    "runtimeRoot":  "app\\src\\main\\assets\\runtime",
+                    "frameworkPath":  "singe/Framework",
+                    "spaceAceScriptTemplate":  "templates/spaceace/SAe.singe"
+                },
+    "files":  [
+                  {
+                      "path":  "singe/Framework/Fonts/m39.ttf",
+                      "sha256":  "fcc5454725d0ee5d312052d0c31416f3d2fb229b76f8fffc7969fb2d93d25e5b",
+                      "size":  15836
+                  },
+                  {
+                      "path":  "singe/Framework/framework.singe",
+                      "sha256":  "9eb12bc42f404f3b70dc3d2b332f76cc479d783ab9f9e01e2b02e365d5659089",
+                      "size":  19213
+                  },
+                  {
+                      "path":  "singe/Framework/globals.singe",
+                      "sha256":  "72ab174fb1f1789fe42bf2e70334ad30e643b0e67b9ace89e26b42933ae0f994",
+                      "size":  7162
+                  },
+                  {
+                      "path":  "singe/Framework/hscore.singe",
+                      "sha256":  "9e282a9769c8f50214633d9f2e08da3b5f0cef7354ccf188efd06f13b7e13c28",
+                      "size":  29356
+                  },
+                  {
+                      "path":  "singe/Framework/main.singe",
+                      "sha256":  "578a44795b893c0af9b1593588ef1628fb73d16ab5a6672a1b377a87fb1acffa",
+                      "size":  151510
+                  },
+                  {
+                      "path":  "singe/Framework/service.singe",
+                      "sha256":  "9c568ac7c13fbb86e5a848c3a8cd3da51df2f5edf70279a8a829b4ecff3ea259",
+                      "size":  87437
+                  },
+                  {
+                      "path":  "singe/Framework/toolbox.singe",
+                      "sha256":  "de5767143527211bfc6a36730cc5d46624d68f6e81c33fe9fc3959ddfc29d69b",
+                      "size":  4469
+                  },
+                  {
+                      "path":  "templates/spaceace/SAe.singe",
+                      "sha256":  "1d401b8c1d3e0176befe9a041bab70c923ae89cf05f3366ff2bc4de00afa8f60",
+                      "size":  24156
+                  }
+              ]
+}
