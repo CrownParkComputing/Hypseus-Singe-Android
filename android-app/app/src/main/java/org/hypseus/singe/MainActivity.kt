@@ -249,11 +249,8 @@ class MainActivity : ComponentActivity() {
                             
                             // For locked games (Space Ace), never auto-switch to singe mode
                             // For multi-game app, detect singe mode from requested game or loose singe scripts
-                            val launchGameName = if (lockedAce && detectedAceSingeScript != null) {
-                                Log.d("HypseusMain", "Locked Space Ace: forcing Singe mode with ${detectedAceSingeScript.absolutePath}")
-                                "singe"
-                            } else if (BuildConfig.LOCKED_GAME_ID.isNotEmpty()) {
-                                // Locked game mode: always use the locked game
+                            val launchGameName = if (BuildConfig.LOCKED_GAME_ID.isNotEmpty()) {
+                                // Locked game mode: always use the locked game (VLDP mode)
                                 Log.d("HypseusMain", "Locked to game: ${BuildConfig.LOCKED_GAME_ID}")
                                 BuildConfig.LOCKED_GAME_ID
                             } else if (isSingeGame(requestedGame) || hasLooseSingeScript(launchBaseFolder)) {
