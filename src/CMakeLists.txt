@@ -169,7 +169,7 @@ if(ANDROID)
     # SDL2 family and audio libs linked from FetchContent-built static targets.
     target_link_libraries( hypseus
         vorbisfile vorbisenc vorbis ogg zip
-        SDL2-static SDL2_ttf SDL2_image SDL2_mixer
+        SDL2-static ${SDL2_TTF_LIBRARY} SDL2_image SDL2_mixer
         android log
     )
 else()
