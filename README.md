@@ -51,20 +51,6 @@ Notes:
 
 - `org.hypseus.singe.spaceace`: Space Ace locked launcher (`spaceace` flavor)
 
-## Optional Dragon's Lair Test Asset Layout
-
-When using the Android Dragon's Lair test flow:
-
-```
-files/
-  vldp/
-    lair/
-      lair.txt
-  roms/
-    lair.zip
-```
-
 ## Related Documentation
 
 - `doc/SingeGameLayout.md`
-- `android-app/TEST_DRAGONS_LAIR.md`
