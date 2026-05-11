@@ -379,7 +379,9 @@ class MainActivity : ComponentActivity() {
                                 aceSingeDir = File(launchSinge).parentFile?.absolutePath ?: launchBaseFolder
                             }
                             
+                            Log.d("HypseusMain", "Launch flow: game=$game, lockedAce=$lockedAce, launchBaseFolder=$launchBaseFolder")
                             if (game == "ace") {
+                                Log.d("HypseusMain", "Checking for SAe singe script in: $launchBaseFolder")
                                 val aceSingeScript = findSpaceAceSingeScript(launchBaseFolder)
                                 if (aceSingeScript != null) {
                                     Log.d("HypseusMain", "Found SAe singe script: ${aceSingeScript.absolutePath}")
@@ -395,8 +397,20 @@ class MainActivity : ComponentActivity() {
                                         Log.w("HypseusMain", "Failed to patch SAe singe script")
                                     }
                                 } else {
-                                    Log.d("HypseusMain", "No SAe.singe script found to patch in: $launchBaseFolder")
+                                    Log.d("HypseusMain", "No SAe.singe script found. Trying alternative paths...")
+                                    // Log candidate paths for debugging
+                                    listOf(
+                                        File(launchBaseFolder, "SAe/SAe.singe"),
+                                        File(launchBaseFolder, "SAe/sae.singe"),
+                                        File(launchBaseFolder, "sae.singe"),
+                                        File(launchBaseFolder, "spaceace/SAe.singe"),
+                                        File(launchBaseFolder, "spaceace/sae.singe")
+                                    ).forEachIndexed { idx, f ->
+                                        Log.d("HypseusMain", "  Candidate[$idx]: ${f.absolutePath} -> exists=${f.isFile}")
+                                    }
                                 }
+                            } else {
+                                Log.d("HypseusMain", "Skipping SAe detection: game != 'ace' (game=$game)")
                             }
                             
                             // For Singe Space Ace, launch as "singe vldp" instead of "ace vldp"
@@ -1548,7 +1562,19 @@ class MainActivity : ComponentActivity() {
                 missing += "Singe script missing: $resolvedSingeScript"
             }
             if (baseFolder.isNotBlank() && File(baseFolder).isDirectory) {
-                missing += validateSingeFolder(File(baseFolder))
+                val externalMissing = validateSingeFolder(File(baseFolder))
+                if (externalMissing.isNotEmpty() && resolvedSingeScript.isNotBlank()) {
+                    // External folder failed framework/asset check — try the script's parent
+                    // directory as fallback (e.g. filesDir/singe/SAe when using bundled assets).
+                    val scriptParent = File(resolvedSingeScript).parentFile
+                    if (scriptParent != null && scriptParent.canonicalPath != File(baseFolder).canonicalPath) {
+                        missing += validateSingeFolder(scriptParent)
+                    } else {
+                        missing += externalMissing
+                    }
+                } else {
+                    missing += externalMissing
+                }
             }
         } else {
             val requiredRoms = expectedRomFiles(gameLower)
@@ -1751,7 +1777,10 @@ class MainActivity : ComponentActivity() {
         if (isSingeGame(normalizedGame) || normalizedGame == "singe") {
             romDirPath = baseFolder
             val singeScriptFile = File(singeScriptPath)
-            val singeOutsideBase = singeScriptPath.isNotBlank() && !isPathUnder(base, singeScriptFile)
+            // A script in internal app storage (filesDir) is intentional — don't replace it.
+            val singeOutsideBase = singeScriptPath.isNotBlank() &&
+                !isPathUnder(base, singeScriptFile) &&
+                !isPathUnder(filesDir, singeScriptFile)
             if (singeScriptPath.isBlank() || !singeScriptFile.isFile || singeOutsideBase) {
                 singeScriptPath = guessDefaultSingeScript(baseFolder)
             }
@@ -2142,8 +2171,12 @@ class MainActivity : ComponentActivity() {
 
         val gameDir = source.parentFile ?: return null
         val parentDir = gameDir.parentFile
-        val hasParentFramework = parentDir != null &&
-            (File(parentDir, "Framework").isDirectory || File(parentDir, "FrameworkKimmy").isDirectory)
+            // Only treat an adjacent Framework/ as the "parent framework" when the script is on
+            // external storage.  For scripts inside filesDir (bundled assets), we always use the
+            // BASEDIR="singe" convention so the engine resolves paths via filesDir/singe/Framework/.
+            val isInternalScript = isPathUnder(filesDir, source)
+            val hasParentFramework = !isInternalScript && parentDir != null &&
+                (File(parentDir, "Framework").isDirectory || File(parentDir, "FrameworkKimmy").isDirectory)
         val singeDir = if (hasParentFramework) parentDir ?: gameDir else gameDir
         val patchedDir = File(filesDir, "patched_singe/${gameDir.name}").apply { mkdirs() }
         val patched = File(patchedDir, source.name)
@@ -2471,13 +2504,24 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun getPreferredDefaultRootDir(): String {
-        val candidates = listOf(
-            File("/storage/FEDD-B1FF/Hypseus/dragons_lair_classic"),
-            File("/storage/FEDD-B1FF/Hypseus/DLe"),
-            File("/sdcard/dragons_lair_classic"),
-            File("/sdcard/DLe"),
-            File("/storage/0000-0000/DLe"),
-        )
+        val candidates = if (BuildConfig.LOCKED_GAME_ID.equals("ace", ignoreCase = true)) {
+            listOf(
+                File("/storage/FEDD-B1FF/Hypseus/SAe"),
+                File("/sdcard/Hypseus/SAe"),
+                File("/sdcard/SAe"),
+                File("/storage/0000-0000/SAe"),
+                File("/storage/FEDD-B1FF/Hypseus/dragons_lair_classic"),
+                File("/storage/FEDD-B1FF/Hypseus/DLe"),
+            )
+        } else {
+            listOf(
+                File("/storage/FEDD-B1FF/Hypseus/dragons_lair_classic"),
+                File("/storage/FEDD-B1FF/Hypseus/DLe"),
+                File("/sdcard/dragons_lair_classic"),
+                File("/sdcard/DLe"),
+                File("/storage/0000-0000/DLe"),
+            )
+        }
         for (dir in candidates) {
             if (dir.isDirectory) return dir.absolutePath
         }
@@ -2522,6 +2566,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun findSpaceAceSingeScript(baseFolder: String): File? {
+        // Check internal bundled location first — populated by refreshSinge2SpaceAceSupportTree().
+        // This lets the game launch without requiring the SAe.singe script to be present in the
+        // external ROM folder.
+        val internalSae = File(filesDir, "singe/SAe/SAe.singe")
+        if (internalSae.isFile) return internalSae
+
         val base = File(baseFolder)
         if (!base.isDirectory) return null
 
@@ -2943,6 +2993,12 @@ class MainActivity : ComponentActivity() {
     )
 
     private fun resetWizardForNewInstall(prefs: android.content.SharedPreferences): Boolean {
+        // Locked single-game builds should not force the setup wizard on every APK update.
+        // We still allow the normal permission checks to drive the UI state.
+        if (BuildConfig.LOCK_GAME_SELECTION) {
+            return false
+        }
+
         // Check if any picker URIs are saved - if none, it's a fresh install
         val hasSavedUris = prefs.all.keys.any { it.contains("_uri") }
         if (!hasSavedUris) {
@@ -3083,7 +3139,6 @@ class MainActivity : ComponentActivity() {
             // Keep Singe framework/templates up to date on upgrades even when the
             // legacy sentinel indicates runtime extraction already happened.
             refreshRuntimeDir("runtime/singe/Framework")
-            refreshRuntimeDir("runtime/templates/spaceace")
             refreshSinge2SpaceAceSupportTree()
             Log.d("HypseusMain", "extractBundledAssets: sentinel exists, skipping")
             return
@@ -3153,27 +3208,38 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun refreshSinge2SpaceAceSupportTree() {
+        // Only applicable to the Space Ace (spaceace) flavor build
+        if (!BuildConfig.LOCKED_GAME_ID.equals("ace", ignoreCase = true)) return
+
         val saeRoot = File(filesDir, "singe/SAe")
         val cfgDir = File(saeRoot, "Cfg")
         val scriptDir = File(saeRoot, "Script")
         val overlayDir = File(saeRoot, "Overlay")
         val soundsDir = File(saeRoot, "Sounds")
         val fontsDir = File(saeRoot, "Fonts")
-        val videoDir = File(saeRoot, "Video")
+        val structureDir = File(saeRoot, "Structure")
 
         cfgDir.mkdirs()
         scriptDir.mkdirs()
         overlayDir.mkdirs()
         soundsDir.mkdirs()
         fontsDir.mkdirs()
-        videoDir.mkdirs()
+        structureDir.mkdirs()
 
+        // SAe script and info
         refreshRuntimeFile("runtime/templates/spaceace/SAe.singe", "singe/SAe/SAe.singe")
         refreshRuntimeFile("runtime/templates/spaceace/SAe.txt", "singe/SAe/SAe.txt")
-        refreshRuntimeDirTo("runtime/pics", "singe/SAe/Overlay")
-        refreshRuntimeDirTo("runtime/sound", "singe/SAe/Sounds")
-        refreshRuntimeDirTo("runtime/fonts", "singe/SAe/Fonts")
-        refreshRuntimeFile("runtime/fonts/default.ttf", "singe/SAe/Fonts/font.ttf")
+
+        // SAe-specific game assets bundled in the spaceace flavor APK
+        refreshRuntimeDirTo("runtime/templates/spaceace/Cfg", "singe/SAe/Cfg")
+        refreshRuntimeDirTo("runtime/templates/spaceace/Fonts", "singe/SAe/Fonts")
+        refreshRuntimeDirTo("runtime/templates/spaceace/Overlay", "singe/SAe/Overlay")
+        refreshRuntimeDirTo("runtime/templates/spaceace/Script", "singe/SAe/Script")
+        refreshRuntimeDirTo("runtime/templates/spaceace/Sounds", "singe/SAe/Sounds")
+
+        // Copy Singe2 framework files into SAe/Structure so validateSingeFolder() can find them
+        // when launching from internal storage (no external ROM folder framework required)
+        refreshRuntimeDirTo("runtime/singe/Framework", "singe/SAe/Structure")
     }
 
     // Recursively extract assets under assetPath into destRoot, stripping the

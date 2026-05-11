@@ -24,6 +24,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - flavor: Hypseus
+            output_dir: hypseus
+            artifact_name: app-hypseus-debug-apk
           - flavor: Spaceace
             output_dir: spaceace
             artifact_name: app-spaceace-debug-apk
