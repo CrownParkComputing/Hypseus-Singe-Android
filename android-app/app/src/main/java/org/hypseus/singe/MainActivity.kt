@@ -237,7 +237,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                            val launchBaseFolder = capturedBaseFolder
+                            val launchBaseFolder = normalizeBaseFolderSelection(capturedBaseFolder, launchGameName)
                             val launchFramefile = capturedFramefile
                             val launchRomDir = capturedRomDir
                             var launchSinge = capturedSinge
@@ -595,11 +595,12 @@ class MainActivity : ComponentActivity() {
                                 savePickedUri(prefs, game, pickerTarget, it)
                                 when (pickerTarget) {
                                     PickerTarget.BASE_FOLDER -> {
-                                        lairFolderPath = path
-                                        Log.d("HypseusMain", "Set lairFolderPath to: $path")
+                                        val normalizedBase = normalizeBaseFolderSelection(path, game)
+                                        lairFolderPath = normalizedBase
+                                        Log.d("HypseusMain", "Set lairFolderPath to: $normalizedBase (picked: $path)")
                                         val detectedLayout = detectGameLayout(
                                             game = game,
-                                            baseFolder = path,
+                                            baseFolder = normalizedBase,
                                             requestedFramefile = framefilePath,
                                             requestedRomDir = romDirPath,
                                             requestedSingeScript = singeScriptPath,
@@ -1664,6 +1665,48 @@ class MainActivity : ComponentActivity() {
             "ace" -> listOf("ace", "sae", "spaceace", "space_ace")
             else -> listOf(romSetNameForGame(game))
         }
+    }
+
+    private fun normalizeBaseFolderSelection(baseFolder: String, game: String): String {
+        val base = File(baseFolder)
+        if (!base.isDirectory) return baseFolder
+
+        val folderName = base.name.trim().lowercase()
+        val likelyMediaLeaf = folderName in setOf("video", "videos", "media", "sounds", "sound", "overlay", "script")
+
+        val candidates = buildList {
+            add(base)
+            base.parentFile?.let { add(it) }
+            base.parentFile?.parentFile?.let { add(it) }
+        }.distinctBy { runCatching { it.canonicalPath }.getOrElse { it.absolutePath } }
+
+        val preferred = candidates.firstOrNull { candidate ->
+            looksLikeGameRoot(candidate, game)
+        }
+
+        return when {
+            preferred != null -> preferred.absolutePath
+            likelyMediaLeaf && base.parentFile?.isDirectory == true -> base.parentFile!!.absolutePath
+            else -> baseFolder
+        }
+    }
+
+    private fun looksLikeGameRoot(candidate: File, game: String): Boolean {
+        if (!candidate.isDirectory) return false
+
+        val normalizedGame = normalizeLaunchGameName(game)
+        val frameGuess = detectFramefileFromBase(normalizedGame, candidate.absolutePath, "")
+        if (frameGuess.isNotBlank() && File(frameGuess).isFile) return true
+
+        if (isSingeGame(normalizedGame) || normalizedGame == "singe" || normalizedGame == "ace") {
+            val scriptGuess = guessDefaultSingeScript(candidate.absolutePath)
+            if (scriptGuess.isNotBlank() && File(scriptGuess).isFile) return true
+        }
+
+        val romGuess = detectRomDirFromBase(normalizedGame, candidate.absolutePath)
+        if (!romGuess.isNullOrBlank() && File(romGuess).isDirectory) return true
+
+        return false
     }
 
     private fun detectGameLayout(
