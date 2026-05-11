@@ -27,6 +27,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Ensure Git LFS objects are present
+        run: |
+          git lfs install --local
+          git lfs pull
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
