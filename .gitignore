@@ -1,0 +1,65 @@
+*.o
+*.d
+*.a
+*.so
+*.zip
+*.rej
+*.orig
+roms
+build
+build-android-arm64/
+/hypseus
+cmake_configure.log
+ninja_build.log
+ui_dump.txt
+.idea/
+android-app/app/.cxx/
+android-app/app/build/
+android-app/.gradle/
+android-app/.sdk-view/
+android-app/build/
+android-app/.kotlin/
+android-app/*logcat*.txt
+android-app/window_dump*.xml
+
+# Local Android/Gradle cache homes used during troubleshooting builds
+android-app/.gradle-release-home/
+android-app/.gradle-user/
+android-app/.gradle_temp/
+android-app/.sdk-clean/
+android-app/.sdk-clean2/
+android-app/.sdk-clean3/
+android-app/.sdk-clean4/
+android-app/.sdk-full/
+android-app/.sdk-manual/
+android-app/.tmp-tools/
+
+# Local scratch artifacts from device/debug sessions
+screenshot*.png
+*_utf8.lua
+
+# Local machine/build artifacts
+*.log
+*.tmp
+local.properties
+
+# Root-level debug outputs
+build_output.txt
+build_rebuild.txt
+native_log.txt
+prefs_before.xml
+prefs_after.xml
+
+# Android local/debug outputs
+android-app/build_log.txt
+android-app/build_output.txt
+android-app/hypseus_runtime.log
+android-app/device_*.txt
+android-app/*.png
+android-app/*.ogg
+android-app/temp_apk/
+android-app/gradle_home_temp/
+android-app/gradle_home_tmp/
+
+# Local gradle home in workspace root
+gradle_home_temp/

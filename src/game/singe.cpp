@@ -302,6 +302,44 @@ void singe::start()
     if (singe_trace) g_pSingeOut->sep_enable_trace();
 
     g_pSingeOut->sep_startup(m_strGameScript.c_str());
+
+    // if singe didn't get an error during startup...
+    if (!get_quitflag()) {
+
+        m_running = true;
+        while (!get_quitflag()) {
+            // Check if we're on the rankings screen (frames 23291-23376 for SAe)
+            // If so, don't update the scoreboard overlay (which would show LIFE counter)
+            uint32_t cur_frame = g_ldp->get_current_frame();
+            bool is_rankings_screen = (cur_frame >= 23291 && cur_frame <= 23376);
+            
+            if (is_rankings_screen && m_pScoreboard) {
+                // Clear the scoreboard on rankings screen to hide LIFE display
+                m_pScoreboard->Clear();
+            } else {
+                g_pSingeOut->sep_call_lua("onOverlayUpdate", ">i", &intReturn);
+                if (intReturn == 1) {
+                    m_video_overlay_needs_update = true;
+                }
+            }
+
+            if (g_js.jrelx | g_js.jrely)
+                ProcessJoyStruct();
+
+            blit();
+            SDL_check_input();
+            samples::do_queued_callbacks(); // hack to ensure sound callbacks are
+                                            // called at a time when lua can
+                                            // accept them without crashing
+            g_ldp->think_delay(10);         // don't hog cpu, and advance timer
+        }
+
+        m_running = false;
+        g_pSingeOut->sep_call_lua("onShutdown", "");
+    } // end if there was no startup error
+
+    // always call sep_shutdown just to make sure everything gets cleaned up
+    g_pSingeOut->sep_shutdown();
 }
 
 void singe::shutdown()
@@ -324,6 +362,9 @@ void singe::input_enable(Uint8 input, Sint8 mouseID)
         if (cur_ldp) {
             const int delta_ms = (input == SWITCH_SKILL1) ? -50 : 50;
             cur_ldp->nudge_audio_delay(delta_ms);
+
+            // Activate the delay display for 1 second
+            video::vid_activate_delay_display();
 
             char msg[128];
             snprintf(msg,
