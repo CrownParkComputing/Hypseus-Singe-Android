@@ -106,20 +106,68 @@ if(NOT EXISTS "${sdl2_ttf_SOURCE_DIR}/external/harfbuzz/CMakeLists.txt")
     file(COPY "${sdl2_ttf_harfbuzz_SOURCE_DIR}/" DESTINATION "${sdl2_ttf_SOURCE_DIR}/external/harfbuzz")
 endif()
 
+# Prefer the standard path first.
 FetchContent_MakeAvailable(SDL2_ttf)
+
+# In some Android/Gradle+CMake 3.22 configurations, MakeAvailable can finish
+# without registering the expected SDL2_ttf targets in the parent scope.
+# Explicitly add the populated source tree as a fallback.
+if(NOT TARGET SDL2_ttf AND NOT TARGET SDL2_ttf::SDL2_ttf AND NOT TARGET SDL2_ttf-static AND NOT TARGET SDL::ttf)
+    if(EXISTS "${sdl2_ttf_SOURCE_DIR}/CMakeLists.txt")
+        add_subdirectory("${sdl2_ttf_SOURCE_DIR}" "${sdl2_ttf_BINARY_DIR}" EXCLUDE_FROM_ALL)
+    endif()
+endif()
+
 set(_HYPSEUS_SDL2_TTF_TARGET "")
-if(TARGET SDL2_ttf)
-    set(_HYPSEUS_SDL2_TTF_TARGET SDL2_ttf)
-elseif(TARGET SDL2_ttf::SDL2_ttf)
-    set(_HYPSEUS_SDL2_TTF_TARGET SDL2_ttf::SDL2_ttf)
-elseif(TARGET SDL2_ttf::SDL2_ttf-static)
-    set(_HYPSEUS_SDL2_TTF_TARGET SDL2_ttf::SDL2_ttf-static)
-elseif(TARGET SDL2_ttf-static)
-    set(_HYPSEUS_SDL2_TTF_TARGET SDL2_ttf-static)
+set(_HYPSEUS_SDL2_TTF_CANDIDATES
+    SDL2_ttf
+    SDL2_ttf::SDL2_ttf
+    SDL2_ttf::SDL2_ttf-static
+    SDL2_ttf-static
+    SDL::ttf
+)
+
+foreach(_ttf_candidate IN LISTS _HYPSEUS_SDL2_TTF_CANDIDATES)
+    if(TARGET ${_ttf_candidate})
+        set(_HYPSEUS_SDL2_TTF_TARGET ${_ttf_candidate})
+        break()
+    endif()
+endforeach()
+
+if(_HYPSEUS_SDL2_TTF_TARGET STREQUAL "")
+    # Some SDL_ttf packaging variants expose only namespace aliases. Probe all
+    # known targets and pick a stable candidate if present.
+    get_property(_hypseus_all_targets GLOBAL PROPERTY TARGETS)
+    set(_hypseus_ttf_targets "")
+    foreach(_hypseus_target IN LISTS _hypseus_all_targets)
+        if(_hypseus_target MATCHES "(^|::)(SDL2_)?ttf($|[-_:])|SDL2_ttf")
+            list(APPEND _hypseus_ttf_targets ${_hypseus_target})
+        endif()
+    endforeach()
+
+    if(_hypseus_ttf_targets)
+        # Prefer concrete library targets over aliases, but accept either.
+        list(FIND _hypseus_ttf_targets "SDL2_ttf" _hypseus_idx)
+        if(NOT _hypseus_idx EQUAL -1)
+            set(_HYPSEUS_SDL2_TTF_TARGET SDL2_ttf)
+        else()
+            list(FIND _hypseus_ttf_targets "SDL2_ttf::SDL2_ttf" _hypseus_idx)
+            if(NOT _hypseus_idx EQUAL -1)
+                set(_HYPSEUS_SDL2_TTF_TARGET SDL2_ttf::SDL2_ttf)
+            else()
+                list(GET _hypseus_ttf_targets 0 _HYPSEUS_SDL2_TTF_TARGET)
+            endif()
+        endif()
+        message(STATUS "Resolved SDL2_ttf target dynamically as '${_HYPSEUS_SDL2_TTF_TARGET}'")
+    endif()
 endif()
 
 if(_HYPSEUS_SDL2_TTF_TARGET STREQUAL "")
-    message(FATAL_ERROR "SDL2_ttf target not found after FetchContent_MakeAvailable")
+    get_property(_hypseus_all_targets GLOBAL PROPERTY TARGETS)
+    message(FATAL_ERROR
+        "SDL2_ttf target not found after FetchContent_MakeAvailable. "
+        "Known targets: ${_hypseus_all_targets}"
+    )
 endif()
 
 if(TARGET ${_HYPSEUS_SDL2_TTF_TARGET})
