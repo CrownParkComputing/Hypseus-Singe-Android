@@ -10,44 +10,26 @@ This repository builds Android APKs for Hypseus Singe and publishes them through
   - `app-hypseus-debug-v0.1.123.apk`
   - `app-spaceace-debug-v0.1.123.apk`
 
-## Exact Runtime File Layout Required
+## Runtime File Model (Android)
 
-All game data must be placed under Android app files storage:
+The app does not require SAe content to be stored in one fixed folder tree.
+
+- SAe assets can live on external storage in any location.
+- The APK deploys required runtime/support files into the app's own files area.
+- You do not need to manually pre-create one strict `patched_singe/SAe/...` layout on external storage.
+
+App-private files area (seeded by app/APK at runtime):
 
 ```
 /sdcard/Android/data/<package>/files/
 ```
 
-For the multi-game package (`org.hypseus.singe`), required Singe layout:
+External content location:
 
-```
-files/
-  patched_singe/
-    singe/
-      Framework/
-        globals.singe
-    SAe/
-      sae.singe
-```
+- User-managed and flexible (for example, a Retroid SAe folder).
+- Path can vary per device/setup.
 
-General per-game rule:
-
-```
-files/
-  patched_singe/
-    <GameFolder>/
-      <main_script>.singe
-```
-
-The main script is expected to load framework globals from:
-
-```
-BASEDIR .. "/Framework/globals.singe"
-```
-
-so `patched_singe/singe/Framework/globals.singe` must exist.
-
-## Package and Launcher Mapping
+Notes:
 
 - `org.hypseus.singe`: multi-game launcher (`hypseus` flavor)
 - `org.hypseus.singe.spaceace`: Space Ace locked launcher (`spaceace` flavor)
