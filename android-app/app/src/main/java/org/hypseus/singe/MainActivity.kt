@@ -308,11 +308,11 @@ class MainActivity : ComponentActivity() {
                                     originalFramefile = effectiveFramefile,
                                     baseFolder = launchBaseFolder,
                                 )
-                            } else if (game == "singe") {
+                            } else if (isSingeGame(game) || game == "singe") {
                                 effectiveFramefile = prepareGameFolderFramefile(
                                     originalFramefile = effectiveFramefile,
                                     baseFolder = launchBaseFolder,
-                                    suffix = "singe",
+                                    suffix = game,
                                 )
                             }
 
@@ -2140,6 +2140,7 @@ class MainActivity : ComponentActivity() {
                 if (mediaFile.startsWith("Video/", ignoreCase = true)) {
                     mediaFile = mediaFile.substring("Video/".length)
                 }
+                mediaFile = resolveFramefileMediaName(videoDir, mediaFile)
                 normalizedLines[mediaIndex] = "${tokens[0]} $mediaFile"
             }
         }
@@ -2156,6 +2157,30 @@ class MainActivity : ComponentActivity() {
             Log.w("HypseusMain", "prepareGameFolderFramefile: failed to write override: ${it.message}")
             originalFramefile
         }
+    }
+
+    private fun resolveFramefileMediaName(videoDir: File, mediaFile: String): String {
+        val requestedName = mediaFile.replace("\\", "/").substringAfterLast('/').trim()
+        if (requestedName.isBlank()) return mediaFile
+
+        val direct = File(videoDir, requestedName)
+        if (direct.isFile) return requestedName
+
+        val caseInsensitive = videoDir.listFiles()
+            ?.firstOrNull { it.isFile && it.name.equals(requestedName, ignoreCase = true) }
+        if (caseInsensitive != null) return caseInsensitive.name
+
+        val ext = requestedName.substringAfterLast('.', "")
+        if (ext.isNotBlank()) {
+            val sameExtCandidates = videoDir.listFiles()
+                ?.filter { it.isFile && it.extension.equals(ext, ignoreCase = true) }
+                .orEmpty()
+            if (sameExtCandidates.size == 1) {
+                return sameExtCandidates.first().name
+            }
+        }
+
+        return requestedName
     }
 
     /**
