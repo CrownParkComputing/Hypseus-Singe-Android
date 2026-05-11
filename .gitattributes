@@ -1,0 +1,6 @@
+android-app/tools/ffmpeg-portable/**/*.exe filter=lfs diff=lfs merge=lfs -text
+android-app/tools/ffmpeg-portable/**/*.dll filter=lfs diff=lfs merge=lfs -text
+android-app/tools/ffmpeg-portable/**/*.zip filter=lfs diff=lfs merge=lfs -text
+android-app/tools/ffmpeg-portable/**/*.7z filter=lfs diff=lfs merge=lfs -text
+android-app/tools/ffmpeg-portable/**/*.tgz filter=lfs diff=lfs merge=lfs -text
+src/3rdparty/libmpeg2/*.tgz filter=lfs diff=lfs merge=lfs -text
