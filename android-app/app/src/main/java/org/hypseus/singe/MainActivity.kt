@@ -1678,7 +1678,7 @@ class MainActivity : ComponentActivity() {
             add(base)
             base.parentFile?.let { add(it) }
             base.parentFile?.parentFile?.let { add(it) }
-        }.distinctBy { runCatching { it.canonicalPath }.getOrElse { it.absolutePath } }
+        }.distinctBy { candidate -> runCatching { candidate.canonicalPath }.getOrElse { candidate.absolutePath } }
 
         val preferred = candidates.firstOrNull { candidate ->
             looksLikeGameRoot(candidate, game)
