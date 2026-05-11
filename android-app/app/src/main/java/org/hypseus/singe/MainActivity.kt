@@ -241,10 +241,18 @@ class MainActivity : ComponentActivity() {
                             val launchFramefile = capturedFramefile
                             val launchRomDir = capturedRomDir
                             var launchSinge = capturedSinge
+                            val lockedAce = BuildConfig.LOCKED_GAME_ID.equals("ace", ignoreCase = true)
+                            val detectedAceSingeScript = if (lockedAce) findSpaceAceSingeScript(launchBaseFolder) else null
+                            if (detectedAceSingeScript != null) {
+                                launchSinge = detectedAceSingeScript.absolutePath
+                            }
                             
                             // For locked games (Space Ace), never auto-switch to singe mode
                             // For multi-game app, detect singe mode from requested game or loose singe scripts
-                            val launchGameName = if (BuildConfig.LOCKED_GAME_ID.isNotEmpty()) {
+                            val launchGameName = if (lockedAce && detectedAceSingeScript != null) {
+                                Log.d("HypseusMain", "Locked Space Ace: forcing Singe mode with ${detectedAceSingeScript.absolutePath}")
+                                "singe"
+                            } else if (BuildConfig.LOCKED_GAME_ID.isNotEmpty()) {
                                 // Locked game mode: always use the locked game
                                 Log.d("HypseusMain", "Locked to game: ${BuildConfig.LOCKED_GAME_ID}")
                                 BuildConfig.LOCKED_GAME_ID
@@ -366,11 +374,15 @@ class MainActivity : ComponentActivity() {
                             var aceUseSinge = false
                             var aceSingeScriptPath = ""
                             var aceSingeDir = launchBaseFolder
+
+                            if (lockedAce && game == "singe" && launchSinge.isNotBlank() && File(launchSinge).isFile) {
+                                aceUseSinge = true
+                                aceSingeScriptPath = launchSinge
+                                aceSingeDir = File(launchSinge).parentFile?.absolutePath ?: launchBaseFolder
+                            }
                             
                             if (game == "ace") {
-                                val aceSingeScript = File(launchBaseFolder, "SAe/SAe.singe").takeIf { it.isFile }
-                                    ?: File(launchBaseFolder, "sae.singe").takeIf { it.isFile }
-                                    ?: File(launchBaseFolder, "SAe/sae.singe").takeIf { it.isFile }
+                                val aceSingeScript = findSpaceAceSingeScript(launchBaseFolder)
                                 if (aceSingeScript != null) {
                                     Log.d("HypseusMain", "Found SAe singe script: ${aceSingeScript.absolutePath}")
                                     val patchedSinge = prepareSingeScriptForAndroid(aceSingeScript.absolutePath)
@@ -2501,6 +2513,20 @@ class MainActivity : ComponentActivity() {
             File(root, "SAe/SAe.singe"),
             File(root, "lair.singe"),
         ).any { it.isFile }
+    }
+
+    private fun findSpaceAceSingeScript(baseFolder: String): File? {
+        val base = File(baseFolder)
+        if (!base.isDirectory) return null
+
+        val candidates = listOf(
+            File(base, "SAe/SAe.singe"),
+            File(base, "SAe/sae.singe"),
+            File(base, "sae.singe"),
+            File(base, "spaceace/SAe.singe"),
+            File(base, "spaceace/sae.singe"),
+        )
+        return candidates.firstOrNull { it.isFile }
     }
 
     private fun guessDefaultSingeScript(rootPath: String): String {
