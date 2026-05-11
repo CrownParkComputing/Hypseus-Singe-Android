@@ -1,7 +1,7 @@
 param(
     [string]$SingeDataRef = "master",
     [string]$SingeDataRepo = "https://github.com/DirtBagXon/hypseus_singe_data.git",
-    [string]$RuntimeRoot = "../app/src/main/assets/runtime",
+    [string]$RuntimeRoot = "../app/src/dle/assets/runtime/templates/dle",
     [string]$ManifestPath = "../upstream/dle-sync-lock.json",
     [switch]$KeepTemp
 )
@@ -73,32 +73,24 @@ try {
         throw "No Framework or FrameworkKimmy directory found in 00-singe2."
     }
 
-    $frameworkDest = Join-Path $runtimeRootAbs "singe\Framework"
-
-    Write-Host "[sync] Copying framework from: $frameworkSrc"
-    if (Test-Path $frameworkDest) { Remove-Item -Recurse -Force $frameworkDest }
-    New-Item -ItemType Directory -Path (Split-Path -Parent $frameworkDest) -Force | Out-Null
-    Copy-Item -Recurse -Force $frameworkSrc $frameworkDest
-
-    $files = Get-ChildItem -Path $frameworkDest -Recurse -File
-    $fileInfos = $files | ForEach-Object { Get-FileHashInfo -Root $runtimeRootAbs -Path $_.FullName }
-
-    $dleSrc = @(
-        (Join-Path $cloneDir "00-singe2\DLe\DLe.singe"),
-        (Join-Path $cloneDir "00-singe2\DLe\dle.singe")
-    ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if (-not $dleSrc) {
-        throw "No DLe.singe/dle.singe found in 00-singe2/DLe."
+    $dleRootSrc = Join-Path $cloneDir "00-singe2\DLe"
+    if (-not (Test-Path -LiteralPath $dleRootSrc)) {
+        throw "Directory 00-singe2/DLe not found."
     }
 
-    $dleDest = Join-Path $runtimeRootAbs "templates\dle\DLe.singe"
+    Write-Host "[sync] Copying DLe template tree from: $dleRootSrc"
+    if (Test-Path $runtimeRootAbs) { Remove-Item -Recurse -Force $runtimeRootAbs }
+    New-Item -ItemType Directory -Path $runtimeRootAbs -Force | Out-Null
+    Copy-Item -Path (Join-Path $dleRootSrc "*") -Destination $runtimeRootAbs -Recurse -Force
 
-    Write-Host "[sync] Copying DLe.singe from: $dleSrc"
-    New-Item -ItemType Directory -Path (Split-Path -Parent $dleDest) -Force | Out-Null
-    Copy-Item -Force $dleSrc $dleDest
+    $structureDest = Join-Path $runtimeRootAbs "Structure"
+    Write-Host "[sync] Refreshing Structure from framework: $frameworkSrc"
+    if (Test-Path $structureDest) { Remove-Item -Recurse -Force $structureDest }
+    New-Item -ItemType Directory -Path $structureDest -Force | Out-Null
+    Copy-Item -Path (Join-Path $frameworkSrc "*") -Destination $structureDest -Recurse -Force
 
-    $dleInfo = Get-FileHashInfo -Root $runtimeRootAbs -Path $dleDest
-    $fileInfos += $dleInfo
+    $files = Get-ChildItem -Path $runtimeRootAbs -Recurse -File
+    $fileInfos = $files | ForEach-Object { Get-FileHashInfo -Root $runtimeRootAbs -Path $_.FullName }
 
     $manifest = [PSCustomObject]@{
         generatedAtUtc = [DateTime]::UtcNow.ToString("o")
@@ -111,8 +103,9 @@ try {
         }
         outputs = [PSCustomObject]@{
             runtimeRoot = (Get-RelativePathPortable -BasePath (Split-Path -Parent $scriptDir) -TargetPath $runtimeRootAbs).Replace('\\', '/')
-            frameworkPath = "singe/Framework"
-            dleScriptTemplate = "templates/dle/DLe.singe"
+            frameworkPath = "Structure"
+            dleScriptTemplate = "DLe.singe"
+            dleFramefileTemplate = "DLe.txt"
         }
         files = $fileInfos | Sort-Object path
     }

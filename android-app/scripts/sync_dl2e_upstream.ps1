@@ -1,7 +1,7 @@
 param(
     [string]$SingeDataRef = "master",
     [string]$SingeDataRepo = "https://github.com/DirtBagXon/hypseus_singe_data.git",
-    [string]$RuntimeRoot = "../app/src/main/assets/runtime",
+    [string]$RuntimeRoot = "../app/src/dl2e/assets/runtime/templates/dl2e",
     [string]$ManifestPath = "../upstream/dl2e-sync-lock.json",
     [switch]$KeepTemp
 )
@@ -73,32 +73,24 @@ try {
         throw "No Framework or FrameworkKimmy directory found in 00-singe2."
     }
 
-    $frameworkDest = Join-Path $runtimeRootAbs "singe\Framework"
-
-    Write-Host "[sync] Copying framework from: $frameworkSrc"
-    if (Test-Path $frameworkDest) { Remove-Item -Recurse -Force $frameworkDest }
-    New-Item -ItemType Directory -Path (Split-Path -Parent $frameworkDest) -Force | Out-Null
-    Copy-Item -Recurse -Force $frameworkSrc $frameworkDest
-
-    $files = Get-ChildItem -Path $frameworkDest -Recurse -File
-    $fileInfos = $files | ForEach-Object { Get-FileHashInfo -Root $runtimeRootAbs -Path $_.FullName }
-
-    $dl2eSrc = @(
-        (Join-Path $cloneDir "00-singe2\DL2e\DL2e.singe"),
-        (Join-Path $cloneDir "00-singe2\DL2e\dl2e.singe")
-    ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if (-not $dl2eSrc) {
-        throw "No DL2e.singe/dl2e.singe found in 00-singe2/DL2e."
+    $dl2eRootSrc = Join-Path $cloneDir "00-singe2\DL2e"
+    if (-not (Test-Path -LiteralPath $dl2eRootSrc)) {
+        throw "Directory 00-singe2/DL2e not found."
     }
 
-    $dl2eDest = Join-Path $runtimeRootAbs "templates\dl2e\DL2e.singe"
+    Write-Host "[sync] Copying DL2e template tree from: $dl2eRootSrc"
+    if (Test-Path $runtimeRootAbs) { Remove-Item -Recurse -Force $runtimeRootAbs }
+    New-Item -ItemType Directory -Path $runtimeRootAbs -Force | Out-Null
+    Copy-Item -Path (Join-Path $dl2eRootSrc "*") -Destination $runtimeRootAbs -Recurse -Force
 
-    Write-Host "[sync] Copying DL2e.singe from: $dl2eSrc"
-    New-Item -ItemType Directory -Path (Split-Path -Parent $dl2eDest) -Force | Out-Null
-    Copy-Item -Force $dl2eSrc $dl2eDest
+    $structureDest = Join-Path $runtimeRootAbs "Structure"
+    Write-Host "[sync] Refreshing Structure from framework: $frameworkSrc"
+    if (Test-Path $structureDest) { Remove-Item -Recurse -Force $structureDest }
+    New-Item -ItemType Directory -Path $structureDest -Force | Out-Null
+    Copy-Item -Path (Join-Path $frameworkSrc "*") -Destination $structureDest -Recurse -Force
 
-    $dl2eInfo = Get-FileHashInfo -Root $runtimeRootAbs -Path $dl2eDest
-    $fileInfos += $dl2eInfo
+    $files = Get-ChildItem -Path $runtimeRootAbs -Recurse -File
+    $fileInfos = $files | ForEach-Object { Get-FileHashInfo -Root $runtimeRootAbs -Path $_.FullName }
 
     $manifest = [PSCustomObject]@{
         generatedAtUtc = [DateTime]::UtcNow.ToString("o")
@@ -111,8 +103,9 @@ try {
         }
         outputs = [PSCustomObject]@{
             runtimeRoot = (Get-RelativePathPortable -BasePath (Split-Path -Parent $scriptDir) -TargetPath $runtimeRootAbs).Replace('\\', '/')
-            frameworkPath = "singe/Framework"
-            dl2eScriptTemplate = "templates/dl2e/DL2e.singe"
+            frameworkPath = "Structure"
+            dl2eScriptTemplate = "DL2e.singe"
+            dl2eFramefileTemplate = "DL2e.txt"
         }
         files = $fileInfos | Sort-Object path
     }

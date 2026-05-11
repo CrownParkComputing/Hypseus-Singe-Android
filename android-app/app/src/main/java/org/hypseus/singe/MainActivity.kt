@@ -238,22 +238,28 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             val launchBaseFolder = normalizeBaseFolderSelection(capturedBaseFolder, requestedGame)
-                            val launchFramefile = capturedFramefile
+                            var launchFramefile = capturedFramefile
                             val launchRomDir = capturedRomDir
                             var launchSinge = capturedSinge
-                            val lockedAce = BuildConfig.LOCKED_GAME_ID.equals("ace", ignoreCase = true)
-                            val detectedAceSingeScript = if (lockedAce) findSpaceAceSingeScript(launchBaseFolder) else null
-                            if (detectedAceSingeScript != null) {
-                                launchSinge = detectedAceSingeScript.absolutePath
+                            val lockedGameId = BuildConfig.LOCKED_GAME_ID
+                            val lockedAce = lockedGameId.equals("ace", ignoreCase = true)
+                            val detectedLockedSingeScript = findBundledSingeScriptForLockedGame(lockedGameId, launchBaseFolder)
+                            if (detectedLockedSingeScript != null) {
+                                launchSinge = detectedLockedSingeScript.absolutePath
+                                if (launchFramefile.isBlank() || !File(launchFramefile).isFile) {
+                                    findBundledFramefileForLockedGame(lockedGameId)?.let { bundledFramefile ->
+                                        launchFramefile = bundledFramefile.absolutePath
+                                    }
+                                }
                             }
                             
-                                // Locked Space Ace should stay on the Singe launch path when SAe assets exist.
-                                val launchGameName = if (lockedAce && detectedAceSingeScript != null) {
-                                    Log.d("HypseusMain", "Locked Space Ace: forcing Singe mode with ${detectedAceSingeScript.absolutePath}")
+                                // Locked game flavors should stay on the Singe launch path when bundled assets exist.
+                                val launchGameName = if (detectedLockedSingeScript != null) {
+                                    Log.d("HypseusMain", "Locked $lockedGameId: forcing Singe mode with ${detectedLockedSingeScript.absolutePath}")
                                     "singe"
-                                } else if (BuildConfig.LOCKED_GAME_ID.isNotEmpty()) {
-                                    Log.d("HypseusMain", "Locked to game: ${BuildConfig.LOCKED_GAME_ID}")
-                                    BuildConfig.LOCKED_GAME_ID
+                                } else if (lockedGameId.isNotEmpty()) {
+                                    Log.d("HypseusMain", "Locked to game: $lockedGameId")
+                                    lockedGameId
                             } else if (isSingeGame(requestedGame) || hasLooseSingeScript(launchBaseFolder)) {
                                 "singe"
                             } else {
@@ -2566,12 +2572,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun findSpaceAceSingeScript(baseFolder: String): File? {
-        // Check internal bundled location first — populated by refreshSinge2SpaceAceSupportTree().
-        // This lets the game launch without requiring the SAe.singe script to be present in the
-        // external ROM folder.
-        val internalSae = File(filesDir, "singe/SAe/SAe.singe")
-        if (internalSae.isFile) return internalSae
-
         val base = File(baseFolder)
         if (!base.isDirectory) return null
 
@@ -2583,6 +2583,41 @@ class MainActivity : ComponentActivity() {
             File(base, "spaceace/sae.singe"),
         )
         return candidates.firstOrNull { it.isFile }
+    }
+
+    private data class BundledSingeSpec(
+        val templateFolder: String,
+        val runtimeFolder: String,
+        val scriptFile: String,
+        val framefileName: String,
+    )
+
+    private fun bundledSingeSpecForLockedGame(lockedGameId: String): BundledSingeSpec? {
+        return when (normalizeLaunchGameName(lockedGameId)) {
+            "ace" -> BundledSingeSpec("spaceace", "SAe", "SAe.singe", "SAe.txt")
+            "dle" -> BundledSingeSpec("dle", "DLe", "DLe.singe", "DLe.txt")
+            "dl2e" -> BundledSingeSpec("dl2e", "DL2e", "DL2e.singe", "DL2e.txt")
+            "dlclassic" -> BundledSingeSpec("dlclassic", "dragons_lair_classic", "dragons_lair_classic.singe", "dragons_lair_classic.txt")
+            else -> null
+        }
+    }
+
+    private fun findBundledSingeScriptForLockedGame(lockedGameId: String, baseFolder: String): File? {
+        val spec = bundledSingeSpecForLockedGame(lockedGameId) ?: return null
+        val internalScript = File(filesDir, "singe/${spec.runtimeFolder}/${spec.scriptFile}")
+        if (internalScript.isFile) return internalScript
+
+        return if (normalizeLaunchGameName(lockedGameId) == "ace") {
+            findSpaceAceSingeScript(baseFolder)
+        } else {
+            null
+        }
+    }
+
+    private fun findBundledFramefileForLockedGame(lockedGameId: String): File? {
+        val spec = bundledSingeSpecForLockedGame(lockedGameId) ?: return null
+        val internalFramefile = File(filesDir, "singe/${spec.runtimeFolder}/${spec.framefileName}")
+        return internalFramefile.takeIf { it.isFile }
     }
 
     private fun guessDefaultSingeScript(rootPath: String): String {
@@ -3139,14 +3174,14 @@ class MainActivity : ComponentActivity() {
             // Keep Singe framework/templates up to date on upgrades even when the
             // legacy sentinel indicates runtime extraction already happened.
             refreshRuntimeDir("runtime/singe/Framework")
-            refreshSinge2SpaceAceSupportTree()
+            refreshBundledSingeSupportTrees()
             Log.d("HypseusMain", "extractBundledAssets: sentinel exists, skipping")
             return
         }
         Log.d("HypseusMain", "extractBundledAssets: extracting runtime assets to ${filesDir.absolutePath}")
         try {
             extractAssetDir("runtime", filesDir)
-            refreshSinge2SpaceAceSupportTree()
+            refreshBundledSingeSupportTrees()
             Log.d("HypseusMain", "extractBundledAssets: complete")
         } catch (e: Exception) {
             Log.e("HypseusMain", "extractBundledAssets failed: ${e.javaClass.simpleName}: ${e.message}")
@@ -3207,39 +3242,45 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun refreshSinge2SpaceAceSupportTree() {
-        // Only applicable to the Space Ace (spaceace) flavor build
-        if (!BuildConfig.LOCKED_GAME_ID.equals("ace", ignoreCase = true)) return
+    private fun refreshBundledSingeSupportTrees() {
+        // Refresh all bundled Singe trees that are present in this flavor's APK.
+        val specs = listOf(
+            BundledSingeSpec("spaceace", "SAe", "SAe.singe", "SAe.txt"),
+            BundledSingeSpec("dle", "DLe", "DLe.singe", "DLe.txt"),
+            BundledSingeSpec("dl2e", "DL2e", "DL2e.singe", "DL2e.txt"),
+            BundledSingeSpec("dlclassic", "dragons_lair_classic", "dragons_lair_classic.singe", "dragons_lair_classic.txt"),
+        )
 
-        val saeRoot = File(filesDir, "singe/SAe")
-        val cfgDir = File(saeRoot, "Cfg")
-        val scriptDir = File(saeRoot, "Script")
-        val overlayDir = File(saeRoot, "Overlay")
-        val soundsDir = File(saeRoot, "Sounds")
-        val fontsDir = File(saeRoot, "Fonts")
-        val structureDir = File(saeRoot, "Structure")
+        for (spec in specs) {
+            val templateRoot = "runtime/templates/${spec.templateFolder}"
+            val templateEntries = assets.list(templateRoot)
+            if (templateEntries == null || templateEntries.isEmpty()) continue
 
-        cfgDir.mkdirs()
-        scriptDir.mkdirs()
-        overlayDir.mkdirs()
-        soundsDir.mkdirs()
-        fontsDir.mkdirs()
-        structureDir.mkdirs()
+            val runtimeRoot = "singe/${spec.runtimeFolder}"
+            listOf("Cfg", "Script", "Overlay", "Sounds", "Fonts", "Video", "Structure").forEach { subDir ->
+                File(filesDir, "$runtimeRoot/$subDir").mkdirs()
+            }
 
-        // SAe script and info
-        refreshRuntimeFile("runtime/templates/spaceace/SAe.singe", "singe/SAe/SAe.singe")
-        refreshRuntimeFile("runtime/templates/spaceace/SAe.txt", "singe/SAe/SAe.txt")
+            refreshRuntimeFile("$templateRoot/${spec.scriptFile}", "$runtimeRoot/${spec.scriptFile}")
+            refreshRuntimeFile("$templateRoot/${spec.framefileName}", "$runtimeRoot/${spec.framefileName}")
 
-        // SAe-specific game assets bundled in the spaceace flavor APK
-        refreshRuntimeDirTo("runtime/templates/spaceace/Cfg", "singe/SAe/Cfg")
-        refreshRuntimeDirTo("runtime/templates/spaceace/Fonts", "singe/SAe/Fonts")
-        refreshRuntimeDirTo("runtime/templates/spaceace/Overlay", "singe/SAe/Overlay")
-        refreshRuntimeDirTo("runtime/templates/spaceace/Script", "singe/SAe/Script")
-        refreshRuntimeDirTo("runtime/templates/spaceace/Sounds", "singe/SAe/Sounds")
+            listOf("Cfg", "Fonts", "Overlay", "Script", "Sounds", "Video").forEach { subDir ->
+                val source = "$templateRoot/$subDir"
+                val sourceEntries = assets.list(source)
+                if (sourceEntries != null && sourceEntries.isNotEmpty()) {
+                    refreshRuntimeDirTo(source, "$runtimeRoot/$subDir")
+                }
+            }
 
-        // Copy Singe2 framework files into SAe/Structure so validateSingeFolder() can find them
-        // when launching from internal storage (no external ROM folder framework required)
-        refreshRuntimeDirTo("runtime/singe/Framework", "singe/SAe/Structure")
+            val templateStructure = "$templateRoot/Structure"
+            val templateStructureEntries = assets.list(templateStructure)
+            if (templateStructureEntries != null && templateStructureEntries.isNotEmpty()) {
+                refreshRuntimeDirTo(templateStructure, "$runtimeRoot/Structure")
+            } else {
+                // Backward compatibility: if a template does not ship Structure, use default framework.
+                refreshRuntimeDirTo("runtime/singe/Framework", "$runtimeRoot/Structure")
+            }
+        }
     }
 
     // Recursively extract assets under assetPath into destRoot, stripping the
