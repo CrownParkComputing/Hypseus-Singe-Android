@@ -6,17 +6,40 @@ This repository builds Android APKs for Hypseus Singe and publishes them through
 
 - Every successful build on `main` or `master` creates or updates a GitHub Release.
 - Release tag format is `v0.1.<run_number>`.
-- APK files are uploaded with versioned names, for example:
-  - `app-hypseus-debug-v0.1.123.apk`
+- Only the Space Ace APK is built and uploaded.
+- APK file is uploaded with a versioned name, for example:
   - `app-spaceace-debug-v0.1.123.apk`
 
 ## Runtime File Model (Android)
 
-The app does not require SAe content to be stored in one fixed folder tree.
+Use one Space Ace content folder on external storage, then select that folder in the app.
 
-- SAe assets can live on external storage in any location.
-- The APK deploys required runtime/support files into the app's own files area.
-- You do not need to manually pre-create one strict `patched_singe/SAe/...` layout on external storage.
+Example external base path used in testing:
+
+```
+/storage/FEDD-B1FF/Hypseus/SAe/
+```
+
+Exact external layout for Space Ace:
+
+```
+SAe/
+  SAe.txt
+  sae.singe
+  Video/
+    ... laserdisc video/audio files referenced by SAe.txt ...
+  roms/
+    ace.zip
+    # or extracted equivalent:
+    # ace/
+    #   sa_*.bin
+```
+
+Runtime behavior with this layout:
+
+- `-framefile` uses `SAe/SAe.txt`.
+- `-romdir` uses `SAe/roms`.
+- `sae.singe` is read from `SAe/sae.singe` and patched into app-private storage.
 
 App-private files area (seeded by app/APK at runtime):
 
@@ -24,14 +47,8 @@ App-private files area (seeded by app/APK at runtime):
 /sdcard/Android/data/<package>/files/
 ```
 
-External content location:
-
-- User-managed and flexible (for example, a Retroid SAe folder).
-- Path can vary per device/setup.
-
 Notes:
 
-- `org.hypseus.singe`: multi-game launcher (`hypseus` flavor)
 - `org.hypseus.singe.spaceace`: Space Ace locked launcher (`spaceace` flavor)
 
 ## Optional Dragon's Lair Test Asset Layout
