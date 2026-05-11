@@ -65,7 +65,6 @@ import java.util.zip.ZipFile
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
-    private val assetsReady = AtomicBoolean(false)
     private val lastLaunchRealtimeMs = AtomicLong(0)
 
     override fun onResume() {
@@ -76,7 +75,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        Thread { extractBundledAssets(); assetsReady.set(true) }.start()
 
         val activityContext = this
 
@@ -115,7 +113,11 @@ class MainActivity : ComponentActivity() {
                     var pickerTarget by remember { mutableStateOf(PickerTarget.BASE_FOLDER) }
 
                     var lairFolderPath by remember { mutableStateOf(rootDir) }
-                    var framefilePath by remember { mutableStateOf(guessDefaultFramefileWithFallback(filesDir.absolutePath, rootDir, gameName.trim().lowercase())) }
+                    var framefilePath by remember { 
+                        mutableStateOf(
+                            guessDefaultFramefile(rootDir, gameName.trim().lowercase())
+                        )
+                    }
                     var romDirPath by remember { mutableStateOf(rootDir) }
                     var singeScriptPath by remember { mutableStateOf(guessDefaultSingeScript(rootDir)) }
                     var digitalScoreboard by remember { mutableStateOf(false) }
@@ -140,6 +142,7 @@ class MainActivity : ComponentActivity() {
                     val wizardDone = remember { prefs.getBoolean("wizard_done", false) }
                     var wizardStep by remember {
                         val step = when {
+                            BuildConfig.LOCK_GAME_SELECTION -> WizardStep.DONE
                             wizardResetOnThisInstall -> {
                                 // Fresh install: reset wizard to start from media permission
                                 WizardStep.NEED_MEDIA_PERM
@@ -153,6 +156,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val launchGame: () -> Unit = launch@{
+                        Log.d("HypseusMain", "===== LAUNCH BUTTON TAPPED =====")
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
                             Toast.makeText(activityContext, "All Files Access is required. Tap the red button to grant it.", Toast.LENGTH_LONG).show()
                             return@launch
@@ -195,21 +199,6 @@ class MainActivity : ComponentActivity() {
                             if (relaunchDelayMs > 0L) {
                                 Thread.sleep(relaunchDelayMs)
                             }
-                            val waitStartedAt = System.currentTimeMillis()
-                            while (!assetsReady.get()) {
-                                if (System.currentTimeMillis() - waitStartedAt > 8000) {
-                                    runOnUiThread {
-                                        Toast.makeText(
-                                            activityContext,
-                                            "Startup assets still loading. Please try again.",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                        running.value = false
-                                    }
-                                    return@Thread
-                                }
-                                Thread.sleep(50)
-                            }
                             val homeDir = filesDir.absolutePath
                             val requestedGame = normalizeLaunchGameName(capturedGameName)
                             
@@ -243,23 +232,9 @@ class MainActivity : ComponentActivity() {
                             var launchSinge = capturedSinge
                             val lockedGameId = BuildConfig.LOCKED_GAME_ID
                             val lockedAce = lockedGameId.equals("ace", ignoreCase = true)
-                            val detectedLockedSingeScript = findBundledSingeScriptForLockedGame(lockedGameId, launchBaseFolder)
-                            if (detectedLockedSingeScript != null) {
-                                launchSinge = detectedLockedSingeScript.absolutePath
-                                // For locked games, ALWAYS use bundled framefile path to avoid stale user selections
-                                // (e.g., a saved classic framefile being picked up in dl2e flavor).
-                                // Construct the bundled framefile path directly (it will be extracted if needed).
-                                val spec = bundledSingeSpecForLockedGame(lockedGameId)
-                                if (spec != null) {
-                                    launchFramefile = File(filesDir, "singe/${spec.runtimeFolder}/${spec.framefileName}").absolutePath
-                                }
-                            }
                             
-                                // Locked game flavors should stay on the Singe launch path when bundled assets exist.
-                                val launchGameName = if (detectedLockedSingeScript != null) {
-                                    Log.d("HypseusMain", "Locked $lockedGameId: forcing Singe mode with ${detectedLockedSingeScript.absolutePath}")
-                                    "singe"
-                                } else if (lockedGameId.isNotEmpty()) {
+                                // Locked game flavors should launch their game if external storage is configured.
+                                val launchGameName = if (lockedGameId.isNotEmpty()) {
                                     Log.d("HypseusMain", "Locked to game: $lockedGameId")
                                     lockedGameId
                             } else if (isSingeGame(requestedGame) || hasLooseSingeScript(launchBaseFolder)) {
@@ -276,6 +251,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            Log.d("HypseusMain", "About to call detectGameLayout: game=$launchGameName, baseFolder=$launchBaseFolder, framefile=$launchFramefile")
                             val detectedLayout = detectGameLayout(
                                 game = launchGameName,
                                 baseFolder = launchBaseFolder,
@@ -545,6 +521,10 @@ class MainActivity : ComponentActivity() {
                                 args = args,
                                 storageAccessReport = storageAccessReport,
                             )
+
+                            // Sync framework files from external storage to internal storage
+                            // so native engine can find them via relative paths
+                            syncFrameworkFilesFromExternalStorage(launchBaseFolder)
 
                             runOnUiThread {
                                 val freedMb = cleanup.bytesFreed / (1024 * 1024)
@@ -1776,26 +1756,13 @@ class MainActivity : ComponentActivity() {
 
         val lockedGameId = BuildConfig.LOCKED_GAME_ID
         val normalizedLockedGame = normalizeLaunchGameName(lockedGameId)
-        val lockedBundledFramefile = findBundledFramefileForLockedGame(lockedGameId)
-        if (BuildConfig.LOCK_GAME_SELECTION && lockedBundledFramefile != null) {
-            // Locked single-game APKs should always prefer bundled framefiles to avoid
-            // stale user selections (for example a previously saved classic framefile
-            // being used in the DL2e flavor).
-            val shouldForceBundledFramefile =
-                normalizedGame == normalizedLockedGame ||
-                    (normalizedGame == "singe" && isSingeGame(normalizedLockedGame))
-            if (shouldForceBundledFramefile) {
-                framefilePath = lockedBundledFramefile.absolutePath
-                report += "Framefile: forcing locked bundled framefile $framefilePath"
-            }
-        }
 
         val base = File(baseFolder)
         report += "Base folder: $baseFolder (exists=${base.isDirectory})"
 
-        // Framefile: search app bundle first, fallback to selected folder
+        // Framefile: use user-provided storage only (no bundled fallback)
         if (framefilePath.isBlank() || !File(framefilePath).isFile) {
-            framefilePath = guessDefaultFramefileWithFallback(filesDir.absolutePath, baseFolder, normalizedGame)
+            framefilePath = guessDefaultFramefile(baseFolder, normalizedGame)
         }
 
         if (isSingeGame(normalizedGame) || normalizedGame == "singe") {
@@ -1810,9 +1777,11 @@ class MainActivity : ComponentActivity() {
             }
         } else {
             val framefileFile = File(framefilePath)
-            val framefileOutsideBase = framefilePath.isNotBlank() && !isPathUnder(base, framefileFile)
+            // Framefile must be in user-provided external storage
+            val framefileOutsideBase = framefilePath.isNotBlank() && 
+                !isPathUnder(base, framefileFile)
             if (framefilePath.isBlank() || !framefileFile.isFile || framefileOutsideBase) {
-                framefilePath = guessDefaultFramefileWithFallback(filesDir.absolutePath, baseFolder, normalizedGame)
+                framefilePath = guessDefaultFramefile(baseFolder, normalizedGame)
             }
 
             val romDirFile = File(romDirPath)
@@ -2189,6 +2158,61 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Sync framework files from external storage to internal runtime locations.
+     *
+     * Different packs use either Framework/ or FrameworkKimmy/, and the Singe runtime can
+     * resolve "./Framework/..." from multiple working directories depending on launch mode.
+     * Keep all runtime lookup locations hydrated.
+     */
+    private fun syncFrameworkFilesFromExternalStorage(baseFolder: String) {
+        val base = File(baseFolder)
+        val externalFramework = listOf(
+            File(base, "Framework"),
+            File(base, "FrameworkKimmy"),
+            File(base.parentFile, "Framework"),
+            File(base.parentFile, "FrameworkKimmy"),
+        ).firstOrNull { it.isDirectory } ?: return
+
+        val internalFrameworkDirs = mutableListOf(
+            File(filesDir, "Framework"),
+            File(filesDir, "singe/Framework"),
+        )
+
+        File(filesDir, "patched_singe").listFiles()?.forEach { gameDir ->
+            if (gameDir.isDirectory) {
+                internalFrameworkDirs += File(gameDir, "Framework")
+            }
+        }
+
+        internalFrameworkDirs
+            .distinctBy { it.absolutePath }
+            .forEach { internalFramework ->
+                internalFramework.mkdirs()
+
+                externalFramework.walkTopDown().forEach { source ->
+                    val relPath = source.relativeTo(externalFramework).path
+                    val dest = File(internalFramework, relPath)
+                    when {
+                        source.isDirectory -> dest.mkdirs()
+                        source.isFile && (source.extension.equals("singe", ignoreCase = true) || source.name.endsWith(".ttf", ignoreCase = true)) -> {
+                            try {
+                                source.copyTo(dest, overwrite = true)
+                                Log.d("HypseusMain", "Synced framework file: ${dest.absolutePath}")
+                            } catch (e: Exception) {
+                                Log.w("HypseusMain", "Failed to sync framework file ${source.name}: ${e.message}")
+                            }
+                        }
+                    }
+                }
+
+                val globalsFile = File(internalFramework, "globals.singe")
+                if (globalsFile.isFile) {
+                    normalizeSingeFrameworkGlobals(globalsFile)
+                }
+            }
+    }
+
     private fun prepareSingeScriptForAndroid(originalScript: String): SingeLaunchScript? {
         val source = File(originalScript)
         if (!source.isFile) return null
@@ -2249,6 +2273,8 @@ class MainActivity : ComponentActivity() {
             null
         }
     }
+
+
 
     /**
      * Ensures that [filesDir]/singe/Framework/ contains the Singe framework .singe files.
@@ -2603,36 +2629,9 @@ class MainActivity : ComponentActivity() {
         return candidates.firstOrNull { it.isFile }
     }
 
-    private data class BundledSingeSpec(
-        val templateFolder: String,
-        val runtimeFolder: String,
-        val scriptFile: String,
-        val framefileName: String,
-    )
 
-    private fun bundledSingeSpecForLockedGame(lockedGameId: String): BundledSingeSpec? {
-        return when (normalizeLaunchGameName(lockedGameId)) {
-            "ace" -> BundledSingeSpec("spaceace", "SAe", "SAe.singe", "SAe.txt")
-            "dle" -> BundledSingeSpec("dle", "DLe", "DLe.singe", "DLe.txt")
-            "dl2e" -> BundledSingeSpec("dl2e", "DL2e", "DL2e.singe", "DL2e.txt")
-            "dlclassic" -> BundledSingeSpec("dlclassic", "dragons_lair_classic", "dragons_lair_classic.singe", "dragons_lair_classic.txt")
-            else -> null
-        }
-    }
 
-    private fun findBundledSingeScriptForLockedGame(lockedGameId: String, baseFolder: String): File? {
-        val spec = bundledSingeSpecForLockedGame(lockedGameId) ?: return null
-        // For locked games, always return the bundled script path without checking if it exists yet;
-        // it will be extracted during asset extraction (which runs before launch thread uses it).
-        val internalScript = File(filesDir, "singe/${spec.runtimeFolder}/${spec.scriptFile}")
-        return internalScript
-    }
 
-    private fun findBundledFramefileForLockedGame(lockedGameId: String): File? {
-        val spec = bundledSingeSpecForLockedGame(lockedGameId) ?: return null
-        val internalFramefile = File(filesDir, "singe/${spec.runtimeFolder}/${spec.framefileName}")
-        return internalFramefile.takeIf { it.isFile }
-    }
 
     private fun guessDefaultSingeScript(rootPath: String): String {
         val candidates = listOf(
@@ -2697,36 +2696,7 @@ class MainActivity : ComponentActivity() {
         return candidates.first()
     }
 
-    private fun guessDefaultFramefileWithFallback(bundlePath: String, fallbackPath: String, game: String): String {
-        // For Space Ace (locked game), ALWAYS prefer user-selected folder over app bundle
-        // Try selected folder first
-        val fromFallback = guessDefaultFramefile(fallbackPath, game)
-        Log.d("HypseusMain", "Checking fallback (user) path: $fromFallback (exists=${File(fromFallback).isFile})")
-        if (File(fromFallback).isFile) {
-            Log.d("HypseusMain", "Found in user folder: $fromFallback")
-            return fromFallback
-        }
-        
-        // Try standard Hypseus data structure: hypseus_singe_data/00-zip-roms/00-Framework-zip-rom/
-        val standardPath = extractStorageRoot(fallbackPath) + "/hypseus_singe_data/00-zip-roms/00-Framework-zip-rom"
-        val fromStandard = guessDefaultFramefile(standardPath, game)
-        Log.d("HypseusMain", "Checking standard Hypseus path: $fromStandard (exists=${File(fromStandard).isFile})")
-        if (File(fromStandard).isFile) {
-            Log.d("HypseusMain", "Found in standard Hypseus location: $fromStandard")
-            return fromStandard
-        }
-        
-        // Only fall back to app bundle if neither user nor standard location has it
-        val fromBundle = guessDefaultFramefile(bundlePath, game)
-        Log.d("HypseusMain", "Checking bundle path: $fromBundle (exists=${File(fromBundle).isFile})")
-        if (File(fromBundle).isFile) {
-            Log.d("HypseusMain", "Found in bundle: $fromBundle")
-            return fromBundle
-        }
-        // If nothing found, prefer user folder path
-        Log.d("HypseusMain", "Not found anywhere, returning user folder path: $fromFallback")
-        return fromFallback
-    }
+
 
     private fun extractStorageRoot(path: String): String {
         // Extract storage root from paths like /storage/FEDD-B1FF/... or /sdcard/...
@@ -3180,192 +3150,7 @@ class MainActivity : ComponentActivity() {
         DONE,
     }
 
-    private fun extractBundledAssets() {
-        val sentinel = File(filesDir, "pics/led0.bmp")
-        val gamepadIni = File(filesDir, "hypinput_gamepad.ini")
-        if (sentinel.exists() && gamepadIni.exists()) {
-            refreshRuntimeFile("runtime/hypinput_gamepad.ini", "hypinput_gamepad.ini")
-            // Keep Singe framework/templates up to date on upgrades even when the
-            // legacy sentinel indicates runtime extraction already happened.
-            refreshRuntimeDir("runtime/singe/Framework")
-            refreshBundledSingeSupportTrees()
-            Log.d("HypseusMain", "extractBundledAssets: sentinel exists, skipping")
-            return
-        }
-        Log.d("HypseusMain", "extractBundledAssets: extracting runtime assets to ${filesDir.absolutePath}")
-        try {
-            extractAssetDir("runtime", filesDir)
-            refreshBundledSingeSupportTrees()
-            Log.d("HypseusMain", "extractBundledAssets: complete")
-        } catch (e: Exception) {
-            Log.e("HypseusMain", "extractBundledAssets failed: ${e.javaClass.simpleName}: ${e.message}")
-        }
-    }
 
-    private fun refreshRuntimeFile(assetPath: String, relativeTargetPath: String) {
-        try {
-            val target = File(filesDir, relativeTargetPath)
-            target.parentFile?.mkdirs()
-            assets.open(assetPath).use { input: InputStream ->
-                target.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-            Log.d("HypseusMain", "Refreshed $assetPath -> ${target.absolutePath}")
-        } catch (e: Exception) {
-            Log.e("HypseusMain", "Failed to refresh $assetPath: ${e.javaClass.simpleName}: ${e.message}")
-        }
-    }
 
-    private fun refreshRuntimeDir(assetPath: String) {
-        try {
-            extractAssetDir(assetPath, filesDir)
-            Log.d("HypseusMain", "Refreshed directory $assetPath")
-        } catch (e: Exception) {
-            Log.e("HypseusMain", "Failed to refresh directory $assetPath: ${e.javaClass.simpleName}: ${e.message}")
-        }
-    }
 
-    private fun refreshRuntimeDirTo(assetPath: String, relativeTargetPath: String) {
-        try {
-            val target = File(filesDir, relativeTargetPath)
-            target.mkdirs()
-            copyAssetDir(assetPath, target)
-            Log.d("HypseusMain", "Refreshed directory $assetPath -> ${target.absolutePath}")
-        } catch (e: Exception) {
-            Log.e("HypseusMain", "Failed to refresh directory $assetPath to $relativeTargetPath: ${e.javaClass.simpleName}: ${e.message}")
-        }
-    }
-
-    private fun copyAssetDir(assetPath: String, destRoot: File, relativePath: String = "") {
-        val children = assets.list(assetPath)
-        if (children == null || children.isEmpty()) {
-            val target = if (relativePath.isEmpty()) destRoot else File(destRoot, relativePath)
-            target.parentFile?.mkdirs()
-            assets.open(assetPath).use { input: InputStream ->
-                target.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-            return
-        }
-
-        for (child in children) {
-            val childPath = if (relativePath.isEmpty()) child else "$relativePath/$child"
-            copyAssetDir("$assetPath/$child", destRoot, childPath)
-        }
-    }
-
-    private fun refreshBundledSingeSupportTrees() {
-        // Refresh all bundled Singe trees that are present in this flavor's APK.
-        val specs = listOf(
-            BundledSingeSpec("spaceace", "SAe", "SAe.singe", "SAe.txt"),
-            BundledSingeSpec("dle", "DLe", "DLe.singe", "DLe.txt"),
-            BundledSingeSpec("dl2e", "DL2e", "DL2e.singe", "DL2e.txt"),
-            BundledSingeSpec("dlclassic", "dragons_lair_classic", "dragons_lair_classic.singe", "dragons_lair_classic.txt"),
-        )
-
-        for (spec in specs) {
-            val templateRoot = "runtime/templates/${spec.templateFolder}"
-            val templateEntries = assets.list(templateRoot)
-            if (templateEntries == null || templateEntries.isEmpty()) continue
-
-            val runtimeRoot = "singe/${spec.runtimeFolder}"
-            listOf("Cfg", "Script", "Overlay", "Sounds", "Fonts", "Video", "Structure").forEach { subDir ->
-                File(filesDir, "$runtimeRoot/$subDir").mkdirs()
-            }
-
-            refreshRuntimeFile("$templateRoot/${spec.scriptFile}", "$runtimeRoot/${spec.scriptFile}")
-            refreshRuntimeFile("$templateRoot/${spec.framefileName}", "$runtimeRoot/${spec.framefileName}")
-
-            listOf("Cfg", "Fonts", "Overlay", "Script", "Sounds", "Video").forEach { subDir ->
-                val source = "$templateRoot/$subDir"
-                val sourceEntries = assets.list(source)
-                if (sourceEntries != null && sourceEntries.isNotEmpty()) {
-                    refreshRuntimeDirTo(source, "$runtimeRoot/$subDir")
-                }
-            }
-
-            val templateStructure = "$templateRoot/Structure"
-            val templateStructureEntries = assets.list(templateStructure)
-            if (templateStructureEntries != null && templateStructureEntries.isNotEmpty()) {
-                refreshRuntimeDirTo(templateStructure, "$runtimeRoot/Structure")
-            } else {
-                // Backward compatibility: if a template does not ship Structure, use default framework.
-                refreshRuntimeDirTo("runtime/singe/Framework", "$runtimeRoot/Structure")
-            }
-        }
-    }
-
-    // Recursively extract assets under assetPath into destRoot, stripping the
-    // leading "runtime/" prefix so "runtime/pics/led0.bmp" → destRoot/pics/led0.bmp.
-    private fun extractAssetDir(assetPath: String, destRoot: File) {
-        val children = assets.list(assetPath)
-        if (children == null || children.isEmpty()) {
-            // Leaf file — strip "runtime/" and write to destRoot
-            val relPath = assetPath.removePrefix("runtime/")
-            val target = File(destRoot, relPath)
-            target.parentFile?.mkdirs()
-            assets.open(assetPath).use { input: InputStream ->
-                target.outputStream().use { input.copyTo(it) }
-            }
-            Log.d("HypseusMain", "Extracted $assetPath -> ${target.absolutePath}")
-            return
-        }
-        for (child in children) {
-            extractAssetDir("$assetPath/$child", destRoot)
-        }
-    }
-
-    private fun syncRuntimeAssets(externalRoot: File?, internalRoot: File) {
-        if (externalRoot == null) {
-            Log.w("HypseusMain", "syncRuntimeAssets: externalRoot is null")
-            return
-        }
-        Log.d("HypseusMain", "syncRuntimeAssets: externalRoot=${externalRoot.absolutePath} exists=${externalRoot.exists()} canRead=${externalRoot.canRead()}")
-
-        listOf("pics", "fonts", "sound", "midi").forEach { dirName ->
-            val sourceDir = File(externalRoot, dirName)
-            Log.d("HypseusMain", "Checking dir $dirName: exists=${sourceDir.exists()} canRead=${sourceDir.canRead()} isDir=${sourceDir.isDirectory}")
-            if (!sourceDir.exists()) return@forEach
-
-            val targetDir = File(internalRoot, dirName)
-            try {
-                copyDirectory(sourceDir, targetDir)
-            } catch (e: Exception) {
-                Log.e("HypseusMain", "Failed to sync $dirName: ${e.javaClass.simpleName}: ${e.message}")
-            }
-        }
-    }
-
-    private fun copyDirectory(source: File, target: File) {
-        if (source.isDirectory) {
-            if (!target.exists()) {
-                target.mkdirs()
-            }
-
-            val children = source.listFiles()
-            if (children == null) {
-                Log.w("HypseusMain", "listFiles() returned null for ${source.absolutePath}")
-                return
-            }
-            Log.d("HypseusMain", "Listing ${source.absolutePath}: ${children.size} entries")
-            children.forEach { child ->
-                try {
-                    copyDirectory(child, File(target, child.name))
-                } catch (e: Exception) {
-                    Log.e("HypseusMain", "Failed to copy ${child.absolutePath}: ${e.javaClass.simpleName}: ${e.message}")
-                }
-            }
-            return
-        }
-
-        target.parentFile?.mkdirs()
-        source.inputStream().use { input ->
-            target.outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
-        Log.d("HypseusMain", "Synced asset ${source.absolutePath} -> ${target.absolutePath}")
-    }
 }
