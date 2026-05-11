@@ -83,7 +83,7 @@ android {
             buildConfigField("String", "GAME_PROFILE", "\"dle\"")
             buildConfigField("boolean", "LOCK_GAME_SELECTION", "true")
             buildConfigField("String", "LOCKED_GAME_ID", "\"dle\"")
-            resValue("string", "app_name", "Dragon's Lair Extended")
+            resValue("string", "app_name", "Dragons Lair Extended")
         }
 
         create("dl2e") {
@@ -93,7 +93,7 @@ android {
             buildConfigField("String", "GAME_PROFILE", "\"dl2e\"")
             buildConfigField("boolean", "LOCK_GAME_SELECTION", "true")
             buildConfigField("String", "LOCKED_GAME_ID", "\"dl2e\"")
-            resValue("string", "app_name", "Dragon's Lair II Extended")
+            resValue("string", "app_name", "Dragons Lair II Extended")
         }
     }
 
