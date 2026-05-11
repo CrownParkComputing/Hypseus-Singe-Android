@@ -44,6 +44,9 @@ jobs:
         run: |
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
 
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
       - name: Build ${{ matrix.flavor }} Debug APK
         run: ./gradlew assemble${{ matrix.flavor }}Debug
 
