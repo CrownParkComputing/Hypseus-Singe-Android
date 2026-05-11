@@ -436,6 +436,11 @@ class MainActivity : ComponentActivity() {
                                 if (patchedLaunch != null) {
                                     launchSinge = patchedLaunch.scriptPath
                                     launchSingeDir = patchedLaunch.singeDir
+                                    if (aceUseSinge) {
+                                        // Keep forced SAe Singe launch aligned with the patched script.
+                                        aceSingeScriptPath = patchedLaunch.scriptPath
+                                        aceSingeDir = patchedLaunch.singeDir
+                                    }
                                 }
                             }
 
