@@ -383,15 +383,9 @@ class MainActivity : ComponentActivity() {
                             val launchGame = if (aceUseSinge || isSingeGame(game) || game == "singe") "singe" else game
                             var effectiveHomeDir = homeDir
                             var effectiveDataDir = homeDir
-                            if (launchGame == "singe" && launchSinge.isNotBlank() && !launchSinge.endsWith(".zip", ignoreCase = true)) {
-                                val scriptFile = File(launchSinge)
-                                val scriptDir = scriptFile.parentFile
-                                val gameRoot = scriptDir?.parentFile ?: File(launchBaseFolder)
-                                if (File(gameRoot, "Framework").isDirectory || File(gameRoot, "FrameworkKimmy").isDirectory) {
-                                    effectiveHomeDir = gameRoot.absolutePath
-                                    effectiveDataDir = gameRoot.absolutePath
-                                }
-                            }
+                            // Keep homedir/datadir in app-private storage for Singe launches.
+                            // Core runtime assets (for example ./pics and internal framefiles) live there,
+                            // while external game content is resolved through absolute BASEDIR/MYDIR and -singedir.
                             val args = mutableListOf(
                                 launchGame, "vldp",
                                 "-framefile", effectiveFramefile,
