@@ -25,7 +25,7 @@ Example external root used during testing:
 /storage/FEDD-B1FF/Hypseus/
 ```
 
-### Folder layouts by APK
+### External storage folder layouts by APK
 
 #### `app-spaceace-*.apk`
 
@@ -204,6 +204,23 @@ Notes:
 - The unlocked APK also auto-detects well-known layouts such as `DLe/`, `DL2e/`, `SAe/`, and `dragons_lair_classic/`.
 - For native games, no `.singe` script is used.
 - For Singe games, the selected folder must include a readable `.singe` script and a matching framefile.
+
+### Fresh-install wizard reset behavior (all APK flavors)
+
+Each APK flavor resets first-run setup on a true fresh install (no saved picker URIs for that package).
+
+Package names:
+
+- `org.hypseus.singe` (`hypseus`)
+- `org.hypseus.singe.spaceace` (`spaceace`)
+- `org.hypseus.singe.dle` (`dle`)
+- `org.hypseus.singe.dl2e` (`dl2e`)
+- `org.hypseus.singe.dlclassic` (`dlclassic`)
+
+What this means:
+
+- Uninstall/reinstall of any flavor starts from the setup wizard again.
+- Updating an already installed locked flavor keeps existing setup data unless user paths/URIs are missing.
 
 App-private files area (seeded by app/APK at runtime):
 

@@ -3083,11 +3083,10 @@ class MainActivity : ComponentActivity() {
     )
 
     private fun resetWizardForNewInstall(prefs: android.content.SharedPreferences): Boolean {
-        // Locked single-game builds should not force the setup wizard on every APK update.
-        // We still allow the normal permission checks to drive the UI state.
-        if (BuildConfig.LOCK_GAME_SELECTION) {
-            return false
-        }
+        // Every APK flavor should reset the wizard on true fresh install.
+        // For locked single-game builds, we do this only for fresh install
+        // (no saved picker URIs), not for every app update.
+        val isLockedBuild = BuildConfig.LOCK_GAME_SELECTION
 
         // Check if any picker URIs are saved - if none, it's a fresh install
         val hasSavedUris = prefs.all.keys.any { it.contains("_uri") }
@@ -3098,6 +3097,11 @@ class MainActivity : ComponentActivity() {
                 .apply()
             Log.d("HypseusMain", "resetWizardForNewInstall: No saved picker URIs, forcing wizard restart")
             return true
+        }
+
+        // Locked APKs should not force a wizard reset on every update.
+        if (isLockedBuild) {
+            return false
         }
         
         // Also check install timestamp as backup
