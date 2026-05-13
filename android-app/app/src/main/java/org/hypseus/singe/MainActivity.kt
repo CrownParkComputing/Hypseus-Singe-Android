@@ -291,6 +291,10 @@ class MainActivity : ComponentActivity() {
                                 return@Thread
                             }
 
+                            // Core runtime assets must be available under filesDir for native
+                            // startup (for example ./pics/*.bmp during video initialization).
+                            ensureCoreRuntimeAssets()
+
                             if (effectiveFramefile.isBlank() || !File(effectiveFramefile).isFile) {
                                 runOnUiThread {
                                     Toast.makeText(
@@ -383,9 +387,10 @@ class MainActivity : ComponentActivity() {
                             val launchGame = if (aceUseSinge || isSingeGame(game) || game == "singe") "singe" else game
                             var effectiveHomeDir = homeDir
                             var effectiveDataDir = homeDir
-                            // Keep homedir/datadir in app-private storage for Singe launches.
-                            // Core runtime assets (for example ./pics and internal framefiles) live there,
-                            // while external game content is resolved through absolute BASEDIR/MYDIR and -singedir.
+                            // Keep homedir/datadir on app-private storage for Singe launches.
+                            // Engine/UI assets like ./pics are loaded relative to homedir and are
+                            // expected under filesDir, while external content is provided via
+                            // -script and -singedir.
                             val args = mutableListOf(
                                 launchGame, "vldp",
                                 "-framefile", effectiveFramefile,
@@ -1488,6 +1493,36 @@ class MainActivity : ComponentActivity() {
             freeInternalBytes = freeInternalBytes,
             lowStorageCritical = lowStorageCritical,
         )
+    }
+
+    private fun ensureCoreRuntimeAssets() {
+        val required = listOf("pics", "sound", "fonts", "midi", "hypinput_gamepad.ini")
+        required.forEach { relativePath ->
+            runCatching {
+                copyAssetPathRecursively("runtime/$relativePath", File(filesDir, relativePath))
+            }.onFailure {
+                Log.w("HypseusMain", "ensureCoreRuntimeAssets: failed to copy $relativePath: ${it.message}")
+            }
+        }
+    }
+
+    private fun copyAssetPathRecursively(assetPath: String, target: File) {
+        val children = assets.list(assetPath).orEmpty()
+        if (children.isNotEmpty()) {
+            if (!target.exists()) target.mkdirs()
+            children.forEach { child ->
+                copyAssetPathRecursively("$assetPath/$child", File(target, child))
+            }
+            return
+        }
+
+        if (target.isFile && target.length() > 0L) return
+        target.parentFile?.mkdirs()
+        assets.open(assetPath).use { input ->
+            target.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
     }
 
     private fun validateRequiredLaunchFiles(
