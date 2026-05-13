@@ -455,9 +455,13 @@ class MainActivity : ComponentActivity() {
                                 args.add(singeScript)
 
                                 if (!singeScript.endsWith(".zip", ignoreCase = true)) {
-                                    val scriptDir = File(singeScript).parentFile
-                                    val singeRootDir = scriptDir?.parentFile?.absolutePath ?: scriptDir?.absolutePath
-                                    if (singeRootDir != null) {
+                                    val singeRootDir = when {
+                                        aceUseSinge && aceSingeDir.isNotBlank() -> aceSingeDir
+                                        launchSingeDir.isNotBlank() -> launchSingeDir
+                                        else -> File(singeScript).parentFile?.parentFile?.absolutePath
+                                            ?: File(singeScript).parentFile?.absolutePath
+                                    }
+                                    if (!singeRootDir.isNullOrBlank()) {
                                         args.add("-singedir")
                                         args.add(singeRootDir)
                                         Log.d("HypseusMain", "Singe dir root: $singeRootDir")
