@@ -303,7 +303,7 @@ class MainActivity : ComponentActivity() {
                                 return@Thread
                             }
 
-                            if (game == "lair" || game == "laireuro") {
+                            if (game == "lair" || game == "laireuro" || game == "dlclassic") {
                                 effectiveFramefile = prepareLairFramefile(
                                     originalFramefile = effectiveFramefile,
                                     baseFolder = launchBaseFolder,
@@ -338,19 +338,7 @@ class MainActivity : ComponentActivity() {
                                 return@Thread
                             }
 
-                            // Convert absolute framefile path to relative (hypseus expects relative to homedir)
-                            val framefileRelative = try {
-                                val absFramefile = File(effectiveFramefile).canonicalPath
-                                val absHomedir = File(homeDir).canonicalPath
-                                if (absFramefile.startsWith(absHomedir)) {
-                                    absFramefile.substring(absHomedir.length).trimStart('/')
-                                } else {
-                                    effectiveFramefile // fall back if not under homedir
-                                }
-                            } catch (e: Exception) {
-                                effectiveFramefile
-                            }
-                            launchDebugReport = "$launchDebugReport\n\n=== LAUNCH CONFIG ===\nGame: $game (locked to: ${BuildConfig.LOCKED_GAME_ID})\nFramefile absolute: $effectiveFramefile\nFramefile relative: $framefileRelative\nROM dir: $resolvedRomDir\nHomeDir: $homeDir"
+                            launchDebugReport = "$launchDebugReport\n\n=== LAUNCH CONFIG ===\nGame: $game (locked to: ${BuildConfig.LOCKED_GAME_ID})\nFramefile absolute: $effectiveFramefile\nROM dir: $resolvedRomDir\nHomeDir: $homeDir"
 
                             // Detect if Space Ace should launch as singe (with SAe.singe script)
                             var aceUseSinge = false
@@ -369,17 +357,11 @@ class MainActivity : ComponentActivity() {
                                 val aceSingeScript = findSpaceAceSingeScript(launchBaseFolder)
                                 if (aceSingeScript != null) {
                                     Log.d("HypseusMain", "Found SAe singe script: ${aceSingeScript.absolutePath}")
-                                    val patchedSinge = prepareSingeScriptForAndroid(aceSingeScript.absolutePath)
-                                    if (patchedSinge != null) {
-                                        Log.d("HypseusMain", "Successfully patched SAe singe: ${patchedSinge.scriptPath}")
-                                        aceSingeScriptPath = patchedSinge.scriptPath
-                                        aceSingeDir = patchedSinge.singeDir
-                                        aceUseSinge = true
-                                        launchDebugReport = "$launchDebugReport\nLaunching as SINGE with SAe.singe script"
-                                        launchDebugReport = "$launchDebugReport\nPatched SAe.singe paths to BASEDIR/MYDIR"
-                                    } else {
-                                        Log.w("HypseusMain", "Failed to patch SAe singe script")
-                                    }
+                                    aceSingeScriptPath = aceSingeScript.absolutePath
+                                    launchSinge = aceSingeScriptPath
+                                    aceSingeDir = aceSingeScript.parentFile?.absolutePath ?: launchBaseFolder
+                                    aceUseSinge = true
+                                    launchDebugReport = "$launchDebugReport\nLaunching as SINGE with external SAe.singe script"
                                 } else {
                                     Log.d("HypseusMain", "No SAe.singe script found. Trying alternative paths...")
                                     // Log candidate paths for debugging
@@ -399,12 +381,23 @@ class MainActivity : ComponentActivity() {
                             
                             // All Singe-family games must launch via "singe" with an explicit script path.
                             val launchGame = if (aceUseSinge || isSingeGame(game) || game == "singe") "singe" else game
+                            var effectiveHomeDir = homeDir
+                            var effectiveDataDir = homeDir
+                            if (launchGame == "singe" && launchSinge.isNotBlank() && !launchSinge.endsWith(".zip", ignoreCase = true)) {
+                                val scriptFile = File(launchSinge)
+                                val scriptDir = scriptFile.parentFile
+                                val gameRoot = scriptDir?.parentFile ?: File(launchBaseFolder)
+                                if (File(gameRoot, "Framework").isDirectory || File(gameRoot, "FrameworkKimmy").isDirectory) {
+                                    effectiveHomeDir = gameRoot.absolutePath
+                                    effectiveDataDir = gameRoot.absolutePath
+                                }
+                            }
                             val args = mutableListOf(
                                 launchGame, "vldp",
-                                "-framefile", framefileRelative,
+                                "-framefile", effectiveFramefile,
                                 "-fullscreen",
-                                "-homedir", homeDir,
-                                "-datadir", homeDir
+                                "-homedir", effectiveHomeDir,
+                                "-datadir", effectiveDataDir
                             )
                             args.add("-gamepad")
                             if (launchGame != "lair" && launchGame != "laireuro") {
@@ -435,10 +428,12 @@ class MainActivity : ComponentActivity() {
                                     launchSinge = patchedLaunch.scriptPath
                                     launchSingeDir = patchedLaunch.singeDir
                                     if (aceUseSinge) {
-                                        // Keep forced SAe Singe launch aligned with the patched script.
                                         aceSingeScriptPath = patchedLaunch.scriptPath
                                         aceSingeDir = patchedLaunch.singeDir
                                     }
+                                } else {
+                                    val scriptFile = File(launchSinge)
+                                    launchSingeDir = scriptFile.parentFile?.absolutePath ?: launchBaseFolder
                                 }
                             }
 
@@ -459,16 +454,13 @@ class MainActivity : ComponentActivity() {
                                 else args.add("-script")
                                 args.add(singeScript)
 
-                                // For SAe (Space Ace Enhanced), pass -singedir pointing to the
-                                // parent of the game folder on the SD card.  The Singe engine uses
-                                // this as a prefix when resolving "singe/..." asset paths inside
-                                // the Lua scripts (e.g. singe/SAe/Sounds/right.wav).
-                                if (aceUseSinge) {
-                                    val singeRootDir = File(aceSingeDir).parentFile?.absolutePath
+                                if (!singeScript.endsWith(".zip", ignoreCase = true)) {
+                                    val scriptDir = File(singeScript).parentFile
+                                    val singeRootDir = scriptDir?.parentFile?.absolutePath ?: scriptDir?.absolutePath
                                     if (singeRootDir != null) {
                                         args.add("-singedir")
                                         args.add(singeRootDir)
-                                        Log.d("HypseusMain", "SAe singedir: $singeRootDir")
+                                        Log.d("HypseusMain", "Singe dir root: $singeRootDir")
                                     }
                                 }
                             }
@@ -522,9 +514,8 @@ class MainActivity : ComponentActivity() {
                                 storageAccessReport = storageAccessReport,
                             )
 
-                            // Sync framework files from external storage to internal storage
-                            // so native engine can find them via relative paths
-                            syncFrameworkFilesFromExternalStorage(launchBaseFolder)
+                            // Do not mirror framework files into app storage.
+                            // Launch should read script/framework directly from user game folders.
 
                             runOnUiThread {
                                 val freedMb = cleanup.bytesFreed / (1024 * 1024)
@@ -1864,10 +1855,15 @@ class MainActivity : ComponentActivity() {
             base,
             File(base, "roms"),
             File(base, "rom"),
+            File(base, "Roms"),
             File(base, "arcade"),
             File(base, "arcade/roms"),
             File(base, normalizeLaunchGameName(game)),
             File(base, "spaceace"),
+            File(base, "SAe/Roms"),
+            File(base, "SAe/roms"),
+            File(base, "SAe/SAe/Roms"),
+            File(base, "SAe/SAe/roms"),
         )
 
         rootCandidates.firstOrNull { candidate ->
@@ -1909,8 +1905,28 @@ class MainActivity : ComponentActivity() {
         if (!romRoot.isDirectory) return romDir
 
         if (normalizedGame == "ace") {
+            val directRoms = findChildIgnoreCase(romRoot, "Roms") ?: findChildIgnoreCase(romRoot, "roms")
+            if (directRoms?.isDirectory == true) {
+                val hasSpaceAceZip = findChildIgnoreCase(directRoms, "spaceace.zip")?.isFile == true
+                val hasAceZip = findChildIgnoreCase(directRoms, "ace.zip")?.isFile == true
+                val hasSaeZip = findChildIgnoreCase(directRoms, "sae.zip")?.isFile == true
+                if (hasSpaceAceZip || hasAceZip || hasSaeZip) {
+                    return directRoms.absolutePath
+                }
+            }
+
             val nestedSae = findChildIgnoreCase(romRoot, "SAe")
             if (nestedSae?.isDirectory == true) {
+                val nestedSaeRoms = findChildIgnoreCase(nestedSae, "Roms") ?: findChildIgnoreCase(nestedSae, "roms")
+                if (nestedSaeRoms?.isDirectory == true) {
+                    val hasSpaceAceZip = findChildIgnoreCase(nestedSaeRoms, "spaceace.zip")?.isFile == true
+                    val hasAceZip = findChildIgnoreCase(nestedSaeRoms, "ace.zip")?.isFile == true
+                    val hasSaeZip = findChildIgnoreCase(nestedSaeRoms, "sae.zip")?.isFile == true
+                    if (hasSpaceAceZip || hasAceZip || hasSaeZip) {
+                        return nestedSaeRoms.absolutePath
+                    }
+                }
+
                 val hasSaeZip = findChildIgnoreCase(nestedSae, "sae.zip")?.isFile == true
                 val hasAceZip = findChildIgnoreCase(nestedSae, "ace.zip")?.isFile == true
                 val hasSaeDir = findChildIgnoreCase(nestedSae, "sae")?.isDirectory == true
@@ -2186,9 +2202,8 @@ class MainActivity : ComponentActivity() {
     /**
      * Sync framework files from external storage to internal runtime locations.
      *
-     * Different packs use either Framework/ or FrameworkKimmy/, and the Singe runtime can
-     * resolve "./Framework/..." from multiple working directories depending on launch mode.
-     * Keep all runtime lookup locations hydrated.
+     * Different packs reference either "./Framework/..." or "./FrameworkKimmy/...".
+     * Mirror files into both names across all runtime lookup roots.
      */
     private fun syncFrameworkFilesFromExternalStorage(baseFolder: String) {
         val base = File(baseFolder)
@@ -2199,15 +2214,22 @@ class MainActivity : ComponentActivity() {
             File(base.parentFile, "FrameworkKimmy"),
         ).firstOrNull { it.isDirectory } ?: return
 
-        val internalFrameworkDirs = mutableListOf(
-            File(filesDir, "Framework"),
-            File(filesDir, "singe/Framework"),
+        val internalFrameworkRoots = mutableListOf(
+            filesDir,
+            File(filesDir, "singe"),
         )
 
         File(filesDir, "patched_singe").listFiles()?.forEach { gameDir ->
             if (gameDir.isDirectory) {
-                internalFrameworkDirs += File(gameDir, "Framework")
+                internalFrameworkRoots += gameDir
             }
+        }
+
+        val internalFrameworkDirs = internalFrameworkRoots.flatMap { root ->
+            listOf(
+                File(root, "Framework"),
+                File(root, "FrameworkKimmy"),
+            )
         }
 
         internalFrameworkDirs
@@ -2254,35 +2276,21 @@ class MainActivity : ComponentActivity() {
         val patchedDir = File(filesDir, "patched_singe/${gameDir.name}").apply { mkdirs() }
         val patched = File(patchedDir, source.name)
 
-        // Determine the BASEDIR and MYDIR values to patch into the script.
-        // When the game folder sits beside a Framework/ directory (the normal desktop layout),
-        // the parent folder is the CWD (singeDir) and BASEDIR can be ".".
-        // When there is no Framework beside the game, the script likely uses BASEDIR="singe"
-        // so that Framework files live at <homedir>/singe/Framework/.  Preserve that so the
-        // engine can find the framework relative to homedir/CWD.  In that case, also do NOT
-        // patch MYDIR — let the original script expression (BASEDIR.."/"..gameName) evaluate
-        // to "singe/<gameName>" which lua_espath will expand via -singedir.
+        // Patch scripts to absolute external paths so all files are read from user game folders
+        // and not from filesDir/Framework*.
         val baseDir: String?
         val myDir: String?
         if (hasParentFramework) {
-            baseDir = "."
-            myDir = gameDir.name
-        } else if (File(gameDir, "singe/FrameworkKimmy").isDirectory) {
-            baseDir = "singe"
-            myDir = "."
+            baseDir = (parentDir ?: gameDir).absolutePath
+            myDir = gameDir.absolutePath
+        } else if (File(gameDir, "Framework").isDirectory || File(gameDir, "FrameworkKimmy").isDirectory) {
+            baseDir = gameDir.absolutePath
+            myDir = gameDir.absolutePath
         } else {
-            // Script uses BASEDIR="singe".  We patch MYDIR to use triple-slash notation
-            // (e.g. "singe///SAe") so that lua_espath resolves paths correctly.
-            // After stripping the "singe/" prefix, "//SAe/..." makes bSet reach 2
-            // before the first content char, preventing the ".hypseus" insertion.
-            baseDir = "singe"
-            myDir = "singe///${gameDir.name}"
-        }
-
-        // If we need singe/Framework but it does not yet exist under filesDir, try to
-        // copy it from a sibling game folder on the SD card.
-        if (baseDir == "singe" && !hasParentFramework) {
-            ensureSingeFramework(sdCardSearchRoot = parentDir)
+            // Fall back to game directory even if framework is missing; this keeps path
+            // resolution external-only and avoids app-storage framework dependency.
+            baseDir = gameDir.absolutePath
+            myDir = gameDir.absolutePath
         }
 
         return runCatching {
@@ -2416,7 +2424,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun luaString(path: String): String {
-        return path.replace("\\", "\\\\").replace("\"", "\\\"")
+        val normalizedPath = if (path.startsWith("/") && !path.startsWith("///")) {
+            "///" + path.trimStart('/')
+        } else {
+            path
+        }
+        return normalizedPath.replace("\\", "\\\\").replace("\"", "\\\"")
     }
 
     private fun persistSafPermission(uri: Uri) {

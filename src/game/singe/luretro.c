@@ -83,6 +83,15 @@ void lua_espath(const char *src, char *dst, int dstsize)
     char *out = dst;
     int rem = dstsize - 1;
 
+    if (src && src[0] == '/') {
+        while (*src != '\0' && rem > 0) {
+            *out++ = *src++;
+            rem--;
+        }
+        *out = '\0';
+        return;
+    }
+
     unsigned char bSet = 0, end = 0, folder = 0, path = PATH_DAPHNE;
 
     if (bPath(src, "singe/Framework"))

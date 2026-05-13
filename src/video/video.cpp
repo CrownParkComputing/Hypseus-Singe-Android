@@ -1098,6 +1098,10 @@ bool load_bmps()
 // 1 is returned on success, 0 on failure
 bool draw_led(int value, int x, int y, unsigned char end)
 {
+    if (value < 0 || value > 9 || g_led_bmps[value] == NULL || g_sb_blit_surface == NULL) {
+        return true;
+    }
+
     g_sb_surface = g_led_bmps[value];
     static unsigned char led = 0;
 
@@ -1109,8 +1113,7 @@ bool draw_led(int value, int x, int y, unsigned char end)
 
     if (SDL_BlitSurface(g_sb_surface, NULL, g_sb_blit_surface, &dest) != 0) {
         LOGE << fmt("Could not Blit Scoreboard LED's %s", SDL_GetError());
-        set_quitflag();
-        return false;
+        return true;
     }
 
     if (led == end) {
