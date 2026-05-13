@@ -49,6 +49,9 @@ build_rebuild.txt
 native_log.txt
 prefs_before.xml
 prefs_after.xml
+*logcat*.txt
+*_prefs_dump.xml
+ci-artifacts/
 
 # Android local/debug outputs
 android-app/build_log.txt
