@@ -16,7 +16,7 @@ endif()
 string( JOIN " " LIBMPEG2_CFLAGS ${LIBMPEG2_COMPILE_OPTIONS} )
 
 set( LIBMPEG2_ARCHIVE ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/libmpeg2/libmpeg2-master.tgz )
-set( LIBMPEG2_ARCHIVE_SHA256 5aad06f396553c5b6afb5393ff26187bb1120928d6ed4f88d2482dd41d04cf75 )
+set( LIBMPEG2_ARCHIVE_SHA256 5cbf94a93995b485ffe0040bf3221264c2dfe836d316d24c33b58fe808d985b5 )
 set( LIBMPEG2_ARCHIVE_FALLBACK_URL
     https://github.com/DirtBagXon/hypseus-singe/raw/master/src/3rdparty/libmpeg2/libmpeg2-master.tgz
 )
