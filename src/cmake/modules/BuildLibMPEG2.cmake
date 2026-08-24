@@ -100,7 +100,9 @@ else()
 
     externalproject_add( libmpeg2
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/3rdparty
-        URL ../../../src/3rdparty/libmpeg2/libmpeg2-master.tgz
+        # Absolute path: the previous relative URL only resolved when the
+        # binary dir sat exactly one level under the repo root.
+        URL ${LIBMPEG2_ARCHIVE}
         URL_HASH SHA256=${LIBMPEG2_ARCHIVE_SHA256}
 
         CONFIGURE_COMMAND

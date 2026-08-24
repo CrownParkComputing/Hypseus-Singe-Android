@@ -8,7 +8,9 @@ set( LIB_SOURCES
     rgb2yuv.cpp
 )
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86|X86|amd64|AMD64")
+# rgb2yuv-gas.s is 32-bit-only (pushl/popl) and is only referenced under
+# USE_MMX. Matching "x86" also matched x86_64, which fails to assemble.
+if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(i.86|x86|X86)$")
     list(APPEND LIB_SOURCES rgb2yuv-gas.s)
 endif()
 

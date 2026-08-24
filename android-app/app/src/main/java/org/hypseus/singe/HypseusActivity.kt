@@ -82,7 +82,12 @@ class HypseusActivity : SDLActivity(), InputManager.InputDeviceListener {
     override fun onDestroy() {
         super.onDestroy()
         sessionActive = false
+        // Force-exit this process so the OS reclaims the mmap'd .m2v +
+        // libmpeg2 decoded frames. The activity is now in its own process
+        // (:hypseus, declared in AndroidManifest.xml) so killing it doesn't
+        // take down the Flutter picker.
         Runtime.getRuntime().gc()
+        android.os.Process.killProcess(android.os.Process.myPid())
     }
 
     override fun onResume() {

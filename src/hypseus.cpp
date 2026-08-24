@@ -336,12 +336,12 @@ int hypseus_run(int argc, char **argv, bool set_current_dir)
     return result_code;
 }
 
-#if !defined(__ANDROID__)
+#if !defined(__ANDROID__) && !defined(__APPLE__)
 int main(int argc, char **argv)
 {
     return hypseus_run(argc, argv, true);
 }
-#else
+#elif defined(__ANDROID__)
 // On Android, SDLActivity calls SDL_main() via nativeRunMain() after the
 // Android surface/window is ready.  SDL_main.h redefines 'main' as 'SDL_main',
 // but since the non-Android main() above is guarded out, we provide SDL_main
@@ -349,6 +349,15 @@ int main(int argc, char **argv)
 extern "C" int SDL_main(int argc, char **argv)
 {
     return hypseus_run(argc, argv, true);
+}
+#elif defined(__APPLE__)
+// On iOS, UIApplicationMain (Flutter) owns main(). HypseusBridge.mm
+// (ios/Runner/HypseusBridge.mm) calls HypseusMain() on a dedicated pthread
+// so hypseus_run() can own its own SDL UIKit event loop without blocking
+// Flutter. set_current_dir is false because the caller already chdir()s.
+extern "C" int HypseusMain(int argc, char **argv)
+{
+    return hypseus_run(argc, argv, false);
 }
 #endif
 
