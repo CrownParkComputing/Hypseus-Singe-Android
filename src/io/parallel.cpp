@@ -29,7 +29,15 @@
 
 // This used to say: this code only applies to x86-based systems, I believe
 // But MAC_OSX but is x86 has no parallel port...
-#if defined(NATIVE_CPU_X86) && !defined(MAC_OSX)
+//
+// The real question is whether the platform has parallel-port I/O, not what
+// CPU it is. Android on x86_64 (the emulator images) satisfies
+// NATIVE_CPU_X86 but defines neither WIN32 nor UNIX, so every definition
+// below was compiled out and the port stubs went undefined at link time:
+//   ld.lld: error: undefined symbol: par::init(unsigned int)
+// An Android device has no parallel port on any ABI, so send it to the
+// no-parallel-support stubs at the bottom.
+#if defined(NATIVE_CPU_X86) && !defined(MAC_OSX) && !defined(__ANDROID__)
 
 // Code to control the parallel port
 
