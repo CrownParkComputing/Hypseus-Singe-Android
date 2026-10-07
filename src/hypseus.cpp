@@ -171,26 +171,26 @@ int hypseus_run(int argc, char **argv, bool set_current_dir)
     if (set_current_dir && argc > 0 && argv && argv[0])
         set_cur_dir(argv[0]); // set active directory
 
-    // initialize SDL without any subsystems but with the no parachute option so
-    // 1 - we can initialize either audio or video first
-    // 2 - we can trace segfaults using a debugger
-    if (SDL_Init(SDL_INIT_NOPARACHUTE) < 0) {
-        printerror("Could not initialize SDL!");
-        return 1;
+    // initialize SDL with audio and video subsystems
+    SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
+
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) < 0) {
+        printerror(SDL_GetError());
+        return result_code;
     }
 
     if ((IMG_Init(imgflags) & imgflags) != imgflags) {
-        printerror("Could not initialize SDL IMG!");
+        printerror(IMG_GetError());
         IMG_Quit();
         SDL_Quit();
-        return 1;
+        return result_code;
     }
 
     if (TTF_Init() != 0) {
-        printerror("Could not initialize SDL TTF!");
+        printerror(TTF_GetError());
         IMG_Quit();
         SDL_Quit();
-        return 1;
+        return result_code;
     }
 
     // parse the command line (which allocates game and ldp) and continue if no
@@ -292,10 +292,7 @@ int hypseus_run(int argc, char **argv, bool set_current_dir)
             } else {
                 printerror("Sound initialization failed!");
             }
-            // MAC : DON'T do this here, it's too soon
-            // to call SDL_Quit(VIDEO), we don't want segfaults on exit.
-            // video::shutdown_display();
-        }                       // end init display
+        } // end init display
         else {
             printerror("Video initialization failed!");
         }
@@ -309,7 +306,7 @@ int hypseus_run(int argc, char **argv, bool set_current_dir)
     // if our g_game class was allocated
     if (g_game) {
         if (g_game->get_manymouse()) ManyMouse_Quit();
-        result_code = g_game->get_game_errors();
+        result_code = 0;
         delete (g_game);
     }
 
@@ -321,9 +318,6 @@ int hypseus_run(int argc, char **argv, bool set_current_dir)
     video::free_bmps(); // always do this no matter what
     video::deinit_display();
     
-    video::shutdown_display(); // shut down the display. MAC: DON'T do this (calls SDL_Quit(VIDEO)!!)
-                               // until you have ended the sdl_video_run thread AND freed renderer, etc.
-
     restore_leds(); // sets keyboard leds back how they were (this is safe even
                     // if we have the led's disabled)
 
