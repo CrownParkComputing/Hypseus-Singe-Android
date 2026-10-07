@@ -23,11 +23,11 @@ _asm_uBytesToMix:
 .globl _mix_mmx
 _mix_mmx:
 
-	push %ebp	# needs to be preserved
-	push %esi	# points to sample2
-	push %ebx	# # of iterations we are to do
-	push %ecx	# # of iterations we have done
-	push %edx	# points to sample1
+	pushq %rbp	# needs to be preserved
+	pushq %rsi	# points to sample2
+	pushq %rbx	# # of iterations we are to do
+	pushq %rcx	# # of iterations we have done
+	pushq %rdx	# points to sample1
 	# eax points to the destination buffer, but eax doesn't need to be preserved because
 	# it is assumed to hold the return value
 
@@ -68,11 +68,11 @@ MoreStreams:
 
 	emms
 
-	pop %edx
-	pop %ecx
-	pop %ebx
-	pop %esi
-	pop %ebp
+	popq %rdx
+	popq %rcx
+	popq %rbx
+	popq %rsi
+	popq %rbp
 
 	ret
 

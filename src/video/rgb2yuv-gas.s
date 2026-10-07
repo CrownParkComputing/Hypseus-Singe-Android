@@ -98,7 +98,7 @@ _asm_rgb2yuv_result_v:
 .globl	_asm_rgb2yuv
 _asm_rgb2yuv:
 
-        pushl %ebp
+        pushq %rbp
 
         movq _asm_rgb2yuv_input,%mm1
         movq the_offset,%mm7
@@ -136,6 +136,6 @@ _asm_rgb2yuv:
 
         emms
 
-        popl %ebp
+        popq %rbp
 
         ret

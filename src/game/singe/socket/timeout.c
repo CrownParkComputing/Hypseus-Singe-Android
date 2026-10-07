@@ -1,3 +1,4 @@
+#include <limits.h>
 /*=========================================================================*\
 * Timeout management functions
 * LuaSocket toolkit
