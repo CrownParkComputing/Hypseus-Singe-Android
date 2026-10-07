@@ -1685,6 +1685,7 @@ class MainActivity : ComponentActivity() {
             "dragon's lair ii extended", "dragons lair ii extended", "dragon's lair 2 extended", "dragons lair 2 extended", "dl2e" -> "dl2e"
             "space ace enhanced", "space ace extended", "sae" -> "sae"
             "lair" -> "dlclassic"
+            "mad dog", "maddog", "mad dog mccree" -> "maddog"
             "thayers" -> "tq"
             "superd", "superdon" -> "sdq"
             else -> game.trim().lowercase()
@@ -1693,7 +1694,7 @@ class MainActivity : ComponentActivity() {
 
     private fun isSingeGame(game: String): Boolean {
         return when (normalizeLaunchGameName(game)) {
-            "dle", "dlclassic", "dl2e", "sae" -> true
+            "dle", "dlclassic", "dl2e", "sae", "maddog" -> true
             else -> false
         }
     }
@@ -1704,6 +1705,7 @@ class MainActivity : ComponentActivity() {
             "dlclassic" -> "Dragon's Lair Classic"
             "dl2e" -> "Dragon's Lair II Extended"
             "sae" -> "Space Ace Enhanced"
+            "maddog" -> "Mad Dog McCree"
             else -> game
         }
     }
@@ -3073,6 +3075,7 @@ class MainActivity : ComponentActivity() {
         "dlclassic",
         "dl2e",
         "sae",
+        "maddog",
         "laireuro", "lair2",
         "ace",
         "tq",
